@@ -93,37 +93,38 @@ cp .env.example .env.local
 
 Set `CUVEE_AUTH_SECRET` to a long random value before deployment. Cuvée uses a signed,
 HttpOnly session cookie and a local SQLite user/audit database. The server enforces three
-roles: `admin`, `analyst`, and `viewer`; hiding a button in the browser is never treated as
+roles: `platformAdmin`, `wineryAdmin`, `wineryStaff`, `buyerAdmin`, and `buyerStaff`; hiding a button in the browser is never treated as
 authorization.
 
 Local demo accounts are seeded automatically:
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `admin@cuvee.demo` | `cuvee-admin-2024` |
-| Analyst | `analyst@cuvee.demo` | `cuvee-demo-2024` |
-| Viewer | `viewer@cuvee.demo` | `cuvee-view-2024` |
+| 平台超级管理员 | `peradmin@cuvee.demo` | `cuvee-platform-2024` |
+| 酒庄管理员 | `winery-admin@cuvee.demo` | `cuvee-winery-2024` |
+| 酒庄操作员 | `winery-staff@cuvee.demo` | `cuvee-cellar-2024` |
+| 商超 / 酒商管理员 | `buyer-admin@cuvee.demo` | `cuvee-buyer-admin-2024` |
+| 采购员 | `buyer-staff@cuvee.demo` | `cuvee-buyer-staff-2024` |
 
-Admin can open `/admin`; Admin and Analyst can run `/api/analyze`; Viewer receives `403`
+Platform Admin can open `/admin`; Platform Admin, Winery Admin, and Winery Staff can run `/api/analyze`; Buyer Admin and Buyer Staff receive `403`
 for analysis but can read reports explicitly shared through `report_permissions`. Report owners
-and Admin can grant or revoke Viewer access from the report-history card. Replace the demo
+and Platform Admin can grant or revoke access from the report-history card. Replace the demo
 accounts before production.
 
 New users can submit `/register` with an industry organization type (`chateau`, `negociant`,
-`distributor`, or `buyer`). Self-registration always creates a `pending` Viewer account;
-it cannot sign in until an Admin approves it and assigns the final role. Admin may also create
+`distributor`, or `buyer`). Self-registration always creates a `pending` Buyer Staff account;
+it cannot sign in until a Platform Admin approves it and assigns the final role. Platform Admin may also create
 an active user directly, change roles, disable/enable accounts, and cannot alter their own role
 or status accidentally.
 
-Reports carry an explicit visibility level: `private` (owner + Admin only), `restricted`
+Reports carry an explicit visibility level: `private` (owner + Platform Admin only), `restricted`
 (explicit user/organization grants), or `workspace` (authenticated workspace visibility). A grant
 may target an active user or an organization, expire at a fixed time, and independently allow
 or deny Word download. Workspace visibility does not imply download permission; legacy shares are
 migrated as view-only.
 
 Organization classification chooses the default workspace after approval; it never grants
-capabilities. Analysts land in Vineyard or Trade according to organization type, Viewers land in
-Reports, and Admins land in the AOS management console. Château registration uses the bundled classed-growth list
+capabilities. Winery users land in Vineyard, Buyer users land in Trade, and Platform Admins land in the AOS management console. Château registration uses the bundled classed-growth list
 instead of free text. Organization grants target the exact `type + organization name` pair, so a
 report shared with one buyer group is not exposed to every buyer organization.
 
@@ -250,7 +251,7 @@ This replaces sponsor-specific fine-tuning with a non-parametric, transparent me
 
 1. **Orchestrator memory cache** — owner-scoped in-memory `Map`, 30-min TTL, 64-entry LRU
 2. **Persistent analysis-result cache** — SQLite, 24-hour TTL, keyed by authenticated owner plus a SHA-256 hash of region, persona, timeframe, question, château, and complete selected-document contents; identical reruns survive server restarts and do not call the LLM again
-3. **Private document and report history** — authenticated server APIs store documents and reports with `owner_id`; Analyst and Viewer report queries are owner-scoped, while Admin can inspect all resources
+3. **Private document and report history** — authenticated server APIs store documents and reports with `owner_id`; Winery and Buyer user queries are owner-scoped, while Platform Admin can inspect all resources
 4. **Tavily / retrieval SQLite** — `node:sqlite`, 7-day TTL, survives process restarts
 5. **Repo-shipped pre-hydration** — `data/tavily-cache-export.json` seeds the SQLite cache on first read so curated demo queries skip the network
 

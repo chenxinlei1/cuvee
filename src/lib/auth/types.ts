@@ -1,4 +1,4 @@
-export type Role = "admin" | "analyst" | "viewer";
+export type Role = "platformAdmin" | "wineryAdmin" | "wineryStaff" | "buyerAdmin" | "buyerStaff";
 export type OrganizationType = "chateau" | "negociant" | "distributor" | "buyer";
 export type ReportVisibility = "private" | "restricted" | "workspace";
 export type Permission =
@@ -19,7 +19,7 @@ export interface AuthUser {
 }
 
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  admin: [
+  platformAdmin: [
     "analysis:run",
     "report:read",
     "report:read:any",
@@ -28,9 +28,20 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "document:read:any",
     "user:manage",
   ],
-  analyst: ["analysis:run", "report:read", "report:manage", "document:manage"],
-  viewer: ["report:read"],
+  wineryAdmin: ["analysis:run", "report:read", "report:manage", "document:manage"],
+  wineryStaff: ["analysis:run", "report:read", "document:manage"],
+  buyerAdmin: ["report:read"],
+  buyerStaff: ["report:read"],
 };
+
+export const ROLE_LABELS: Record<Role, string> = {
+  platformAdmin: "平台超级管理员",
+  wineryAdmin: "酒庄管理员",
+  wineryStaff: "酒庄操作员",
+  buyerAdmin: "商超 / 酒商管理员",
+  buyerStaff: "采购员",
+};
+
 export function hasPermission(user: AuthUser, permission: Permission): boolean {
   return ROLE_PERMISSIONS[user.role].includes(permission);
 }

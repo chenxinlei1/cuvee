@@ -5,7 +5,7 @@ import { hasPermission } from "@/lib/auth/types";
 import { updateUser, writeAuditLog } from "@/lib/auth/db";
 const Body = z
   .object({
-    role: z.enum(["admin", "analyst", "viewer"]).optional(),
+    role: z.enum(["platformAdmin", "wineryAdmin", "wineryStaff", "buyerAdmin", "buyerStaff"]).optional(),
     status: z.enum(["pending", "active", "disabled"]).optional(),
     organizationType: z.enum(["chateau", "negociant", "distributor", "buyer"]).optional(),
     organizationName: z.string().trim().min(2).max(120).optional(),

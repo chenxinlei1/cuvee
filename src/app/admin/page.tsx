@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/session";
-import { hasPermission } from "@/lib/auth/types";
+import { hasPermission, ROLE_LABELS } from "@/lib/auth/types";
 import { listAuditLogs, listUsers } from "@/lib/auth/db";
 import { UserManager } from "@/components/admin/UserManager";
 
@@ -27,7 +27,7 @@ export default async function AdminPage() {
   const [users, logs] = await Promise.all([listUsers(), listAuditLogs()]);
   const activeUsers = users.filter((item) => item.status === "active").length;
   const pendingUsers = users.filter((item) => item.status === "pending").length;
-  const adminUsers = users.filter((item) => item.role === "admin").length;
+  const platformAdmins = users.filter((item) => item.role === "platformAdmin").length;
 
   return (
     <main className="container mx-auto max-w-7xl px-5 py-8 sm:px-7 lg:py-10">
@@ -38,7 +38,7 @@ export default async function AdminPage() {
         />
         <div className="relative flex flex-col justify-between gap-7 lg:flex-row lg:items-end">
           <div>
-            <p className="kicker">AOS management · Administration</p>
+            <p className="kicker">AOS management · Platform administration</p>
             <h1 className="mt-3 max-w-3xl font-serif text-4xl font-medium leading-none sm:text-5xl">
               Access control
             </h1>
@@ -49,7 +49,7 @@ export default async function AdminPage() {
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <Metric value={activeUsers} label="Active" tone="green" />
             <Metric value={pendingUsers} label="Pending" tone="amber" />
-            <Metric value={adminUsers} label="Admins" tone="neutral" />
+            <Metric value={platformAdmins} label={ROLE_LABELS.platformAdmin} tone="neutral" />
           </div>
         </div>
       </header>

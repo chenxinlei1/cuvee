@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthUser } from "@/lib/auth/types";
-import { hasPermission } from "@/lib/auth/types";
+import { hasPermission, ROLE_LABELS } from "@/lib/auth/types";
 import { useT } from "@/lib/i18n/Provider";
 
 export function AuthNav() {
@@ -32,13 +32,13 @@ export function AuthNav() {
     <div className="flex items-center gap-2">
       {hasPermission(user, "user:manage") ? (
         <Link href="/admin" className="chip">
-          Admin
+          Platform Admin
         </Link>
       ) : null}
       <span className="border-line hidden rounded-pill border px-3 py-2 text-xs md:inline">
         {user.name} ·{" "}
         <span className="text-soft uppercase">
-          {user.organizationType ?? "unassigned"} / {user.role}
+          {user.organizationType ?? "unassigned"} / {ROLE_LABELS[user.role]}
         </span>
       </span>
       <button

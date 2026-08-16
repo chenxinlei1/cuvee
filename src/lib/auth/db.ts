@@ -27,7 +27,7 @@ async function getDatabase(): Promise<import("node:sqlite").DatabaseSync | null>
     database.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
-        password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','analyst','viewer')),
+        password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('platformAdmin','wineryAdmin','wineryStaff','buyerAdmin','buyerStaff')),
         status TEXT NOT NULL DEFAULT 'active', created_at INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS audit_logs (
@@ -81,6 +81,35 @@ async function getDatabase(): Promise<import("node:sqlite").DatabaseSync | null>
       WHEN 'partner' THEN 'restricted'
       WHEN 'public' THEN 'workspace'
       ELSE visibility END`);
+    const usersTable = database
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")
+      .get() as { sql: string } | undefined;
+    if (usersTable?.sql.includes("'admin','analyst','viewer'")) {
+      database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE users_migrated (
+          id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          role TEXT NOT NULL CHECK(role IN ('platformAdmin','wineryAdmin','wineryStaff','buyerAdmin','buyerStaff')),
+          status TEXT NOT NULL DEFAULT 'active', created_at INTEGER NOT NULL,
+          organization_type TEXT, organization_name TEXT
+        );
+        INSERT INTO users_migrated
+          (id,email,name,password_hash,role,status,created_at,organization_type,organization_name)
+        SELECT id,email,name,password_hash,
+          CASE role
+            WHEN 'admin' THEN 'platformAdmin'
+            WHEN 'analyst' THEN 'wineryAdmin'
+            WHEN 'viewer' THEN 'buyerStaff'
+            ELSE role
+          END,
+          status,created_at,organization_type,organization_name
+        FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_migrated RENAME TO users;
+        COMMIT;
+      `);
+    }
     database.exec(`INSERT OR IGNORE INTO report_grants(id,report_id,target_kind,target_value,expires_at,can_download,granted_by,created_at)
       SELECT lower(hex(randomblob(16))),report_id,'user',user_id,NULL,0,granted_by,created_at FROM report_permissions`);
     if (process.env.NODE_ENV !== "production" || process.env.CUVEE_SEED_DEMO_USERS === "true") {
@@ -95,22 +124,30 @@ async function getDatabase(): Promise<import("node:sqlite").DatabaseSync | null>
 }
 function seedDemoUsers(db: import("node:sqlite").DatabaseSync): void {
   const users: Array<[string, string, Role, string]> = [
-    ["admin@cuvee.demo", "Cuvée Admin", "admin", "cuvee-admin-2024"],
-    ["analyst@cuvee.demo", "Vintage Analyst", "analyst", "cuvee-demo-2024"],
-    ["viewer@cuvee.demo", "Report Viewer", "viewer", "cuvee-view-2024"],
+    ["peradmin@cuvee.demo", "Cuvée Platform", "platformAdmin", "cuvee-platform-2024"],
+    ["winery-admin@cuvee.demo", "Vintage Manager", "wineryAdmin", "cuvee-winery-2024"],
+    ["winery-staff@cuvee.demo", "Cellar Operator", "wineryStaff", "cuvee-cellar-2024"],
+    ["buyer-admin@cuvee.demo", "Buyer Admin", "buyerAdmin", "cuvee-buyer-admin-2024"],
+    ["buyer-staff@cuvee.demo", "Buyer Staff", "buyerStaff", "cuvee-buyer-staff-2024"],
   ];
   const insert = db.prepare(`INSERT OR IGNORE INTO users
     (id,email,name,password_hash,role,status,created_at) VALUES (?,?,?,?,?,'active',?)`);
   for (const [email, name, role, password] of users)
     insert.run(randomUUID(), email, name, passwordHash(password), role, Date.now());
   db.prepare(
-    "UPDATE users SET organization_type='chateau',organization_name='Cuvée Platform' WHERE email='admin@cuvee.demo' AND organization_type IS NULL",
+    "UPDATE users SET organization_type='chateau',organization_name='Cuvée Platform' WHERE email='peradmin@cuvee.demo' AND organization_type IS NULL",
   ).run();
   db.prepare(
-    "UPDATE users SET organization_type='chateau',organization_name='Demo Château' WHERE email='analyst@cuvee.demo' AND organization_type IS NULL",
+    "UPDATE users SET organization_type='chateau',organization_name='Demo Château' WHERE email='winery-admin@cuvee.demo' AND organization_type IS NULL",
   ).run();
   db.prepare(
-    "UPDATE users SET organization_type='buyer',organization_name='Demo Buyer Group' WHERE email='viewer@cuvee.demo' AND organization_type IS NULL",
+    "UPDATE users SET organization_type='buyer',organization_name='Demo Buyer Group' WHERE email='buyer-admin@cuvee.demo' AND organization_type IS NULL",
+  ).run();
+  db.prepare(
+    "UPDATE users SET organization_type='chateau',organization_name='Demo Château' WHERE email='winery-staff@cuvee.demo' AND organization_type IS NULL",
+  ).run();
+  db.prepare(
+    "UPDATE users SET organization_type='buyer',organization_name='Demo Buyer Group' WHERE email='buyer-staff@cuvee.demo' AND organization_type IS NULL",
   ).run();
 }
 interface UserRow {
@@ -185,7 +222,7 @@ export async function createUser(input: {
   if (!db) throw new Error("Database unavailable");
   const id = randomUUID();
   const createdAt = Date.now();
-  const role = input.role ?? "viewer";
+  const role = input.role ?? "buyerStaff";
   const status = input.status ?? "pending";
   try {
     db.prepare(

@@ -99,8 +99,8 @@ export const DICT = {
   "auth.login.demo": { fr: "Compte de démonstration", en: "Interview demo" },
   "auth.login.fill_demo": { fr: "Remplir les identifiants de démo", en: "Fill demo credentials" },
   "auth.login.session_note": {
-    fr: "Session serveur sécurisée · Analyste démo : analyst@cuvee.demo / cuvee-demo-2024.",
-    en: "Secure server session · Demo analyst: analyst@cuvee.demo / cuvee-demo-2024.",
+    fr: "Session serveur sécurisée · Démo winery admin : winery-admin@cuvee.demo / cuvee-winery-2024.",
+    en: "Secure server session · Demo winery admin: winery-admin@cuvee.demo / cuvee-winery-2024.",
   },
   "auth.login.return_home": { fr: "Retour à l'accueil", en: "Return home" },
   "auth.error.invalid_email": {

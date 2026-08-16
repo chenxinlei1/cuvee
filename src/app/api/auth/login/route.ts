@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   if (!user) {
     await writeAuditLog(null, "auth.login_failed", "user", undefined, { email: parsed.data.email });
     const status=await userStatusByEmail(parsed.data.email);
-    if(status==="pending")return NextResponse.json({error:"Account awaiting administrator approval"},{status:403});
+    if(status==="pending")return NextResponse.json({error:"Account awaiting platform admin approval"},{status:403});
     if(status==="disabled")return NextResponse.json({error:"Account disabled by administrator"},{status:403});
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }

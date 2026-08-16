@@ -59,7 +59,7 @@ export const ZH_DICT = {
   "auth.login.request_account": "申请新账户",
   "auth.login.demo": "演示账户",
   "auth.login.fill_demo": "填入演示账户",
-  "auth.login.session_note": "安全服务器会话 · 演示分析师：analyst@cuvee.demo / cuvee-demo-2024。",
+  "auth.login.session_note": "安全服务器会话 · 演示酒庄管理员：winery-admin@cuvee.demo / cuvee-winery-2024。",
   "auth.login.return_home": "返回首页",
   "auth.error.invalid_email": "请输入有效的工作邮箱地址。",
   "auth.error.short_password": "密码至少需要 8 个字符。",

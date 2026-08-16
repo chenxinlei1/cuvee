@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import type { AuthUser, OrganizationType, Role } from "@/lib/auth/types";
+import { ROLE_LABELS } from "@/lib/auth/types";
 
 type ManagedUser = AuthUser & { status: string; createdAt: number };
 
@@ -158,9 +159,11 @@ export function UserManager({
             </Field>
             <Field label="Access role">
               <select name="role" className="admin-input">
-                <option value="viewer">Viewer</option>
-                <option value="analyst">Analyst</option>
-                <option value="admin">Admin</option>
+                <option value="buyerStaff">{ROLE_LABELS.buyerStaff}</option>
+                <option value="buyerAdmin">{ROLE_LABELS.buyerAdmin}</option>
+                <option value="wineryStaff">{ROLE_LABELS.wineryStaff}</option>
+                <option value="wineryAdmin">{ROLE_LABELS.wineryAdmin}</option>
+                <option value="platformAdmin">{ROLE_LABELS.platformAdmin}</option>
               </select>
             </Field>
           </div>
@@ -238,9 +241,11 @@ export function UserManager({
                 onChange={(event) => void update(item.id, { role: event.target.value as Role })}
                 className="admin-select disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="admin">Admin</option>
-                <option value="analyst">Analyst</option>
-                <option value="viewer">Viewer</option>
+                <option value="platformAdmin">{ROLE_LABELS.platformAdmin}</option>
+                <option value="wineryAdmin">{ROLE_LABELS.wineryAdmin}</option>
+                <option value="wineryStaff">{ROLE_LABELS.wineryStaff}</option>
+                <option value="buyerAdmin">{ROLE_LABELS.buyerAdmin}</option>
+                <option value="buyerStaff">{ROLE_LABELS.buyerStaff}</option>
               </select>
 
               <div className="flex items-center justify-between gap-3 lg:justify-end">

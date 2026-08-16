@@ -7,7 +7,7 @@ import type { AuthUser } from "@/lib/auth/types";
 import { defaultAppPath } from "@/lib/auth/types";
 import { useT } from "@/lib/i18n/Provider";
 
-const DEMO_EMAIL = "analyst@cuvee.demo";
+const DEMO_EMAIL = "winery-admin@cuvee.demo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -55,7 +55,7 @@ export default function LoginPage() {
 
   function useDemoAccount() {
     setEmail(DEMO_EMAIL);
-    setPassword("cuvee-demo-2024");
+    setPassword("cuvee-winery-2024");
     setError(null);
   }
 
