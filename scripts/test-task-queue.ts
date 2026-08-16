@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import {
+  cancelPendingTask,
   claimNextTask,
   cleanupTasks,
   completeTask,
@@ -10,6 +11,8 @@ import {
   findTaskForUser,
   heartbeatTask,
   insertAnalysisTask,
+  listTasksForAdmin,
+  retryTask,
   updateTaskStage,
 } from "../src/lib/tasks/store";
 import { findUserById, closeDatabase } from "../src/lib/auth/db";
@@ -88,6 +91,14 @@ async function main() {
     assert.equal(completed?.progress, 100);
     assert.equal(completed?.result?.riskScore, 42);
 
+    // ── admin list view includes owner + input summary ────────────────────
+    const adminList = await listTasksForAdmin();
+    const listed = adminList.find((t) => t.id === first);
+    assert(listed, "completed task must appear in admin list");
+    assert.equal(listed.ownerEmail, owner.email);
+    assert.equal(listed.regionName, "Médoc");
+    assert.equal(listed.persona, "vineyard");
+
     // ── failure path ───────────────────────────────────────────────────────
     const second = await insertAnalysisTask(owner, input("second"));
     taskIds.push(second);
@@ -96,6 +107,21 @@ async function main() {
     const failed = await findTaskForUser(owner, second);
     assert.equal(failed?.status, "failed");
     assert.equal(failed?.error, "boom");
+
+    // ── retry failed task → re-queued and claimable ───────────────────────
+    assert(await retryTask(second), "failed task must be retryable");
+    assert.equal((await findTaskForUser(owner, second))?.status, "pending");
+    const retried = await claimNextTask(60_000);
+    assert(retried && retried.id === second, "retried task must be claimable");
+
+    // ── cancel queued task; running/completed tasks are protected ─────────
+    const fourth = await insertAnalysisTask(owner, input("fourth"));
+    taskIds.push(fourth);
+    assert(await cancelPendingTask(fourth), "queued task must be cancellable");
+    assert.equal((await findTaskForUser(owner, fourth))?.status, "cancelled");
+    const afterCancel = await claimNextTask(60_000);
+    assert.notEqual(afterCancel?.id, fourth, "cancelled task must not be claimed");
+    assert.equal(await cancelPendingTask(first), false, "completed task must not be cancellable");
 
     // ── stale heartbeat → crash recovery re-claim ─────────────────────────
     const third = await insertAnalysisTask(owner, input("third"));

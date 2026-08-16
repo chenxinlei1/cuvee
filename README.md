@@ -265,6 +265,11 @@ the LLM budget; disable the in-process worker with
 `CUVEE_WORKER_ENABLED=false` when offloading execution to a dedicated worker
 service.
 
+Platform Admins get a **task queue management view** at `/admin`: live status
+filter (queued / running / completed / failed / cancelled), stage + progress,
+owner and request summary, error details, plus **cancel queued tasks** and
+**retry failed tasks** (both audit-logged).
+
 ### Useful scripts
 
 | Command | Purpose |

@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/session";
 import { hasPermission, ROLE_LABELS } from "@/lib/auth/types";
 import { listAccessRoles, listAuditLogs, listPermissionDefinitions, listUsers } from "@/lib/auth/db";
+import { listTasksForAdmin } from "@/lib/tasks/store";
 import { UserManager } from "@/components/admin/UserManager";
 import { RoleManager } from "@/components/admin/RoleManager";
+import { TaskQueue } from "@/components/admin/TaskQueue";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,13 @@ export default async function AdminPage() {
   if (!user) redirect("/login");
   if (!hasPermission(user, "user:manage")) redirect("/vineyard");
 
-  const [users, logs, roles, permissions] = await Promise.all([listUsers(), listAuditLogs(), listAccessRoles(), listPermissionDefinitions()]);
+  const [users, logs, roles, permissions, tasks] = await Promise.all([
+    listUsers(),
+    listAuditLogs(),
+    listAccessRoles(),
+    listPermissionDefinitions(),
+    listTasksForAdmin(),
+  ]);
   const activeUsers = users.filter((item) => item.status === "active").length;
   const pendingUsers = users.filter((item) => item.status === "pending").length;
   const platformAdmins = users.filter((item) => item.role === "platformAdmin").length;
@@ -98,6 +106,7 @@ export default async function AdminPage() {
         </aside>
       </div>
       {hasPermission(user,"role:manage")?<RoleManager initialRoles={roles} permissionDefinitions={permissions}/>:null}
+      {hasPermission(user,"report:read:any")?<TaskQueue initialTasks={tasks}/>:null}
     </main>
   );
 }

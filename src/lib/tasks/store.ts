@@ -5,7 +5,7 @@ import { hasPermission } from "@/lib/auth/types";
 import type { AuthUser } from "@/lib/auth/types";
 import type { AnalyzeInput, AnalyzeResult } from "@/lib/wine/types";
 
-export type TaskStatus = "pending" | "running" | "completed" | "failed";
+export type TaskStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
 export interface AnalysisTask {
   id: string;
@@ -28,7 +28,17 @@ export interface ClaimedTask {
   input: AnalyzeInput;
 }
 
-async function rowToTask(row: {
+/** Platform-admin view of a task with owner + input summary fields. */
+export interface AdminTask extends AnalysisTask {
+  ownerEmail: string;
+  ownerName: string;
+  regionName: string;
+  persona: string;
+  vintage: string;
+  chateau?: string | null;
+}
+
+function rowToTask(row: {
   id: string;
   owner_id: string;
   organization_id: string | null;
@@ -40,7 +50,7 @@ async function rowToTask(row: {
   created_at: string | number;
   started_at: string | number | null;
   finished_at: string | number | null;
-}): Promise<AnalysisTask> {
+}): AnalysisTask {
   return {
     id: row.id,
     ownerId: row.owner_id,
@@ -175,4 +185,66 @@ export async function cleanupTasks(ttlMs: number): Promise<void> {
         OR (status='pending' AND created_at < $1)`,
     [cutoff],
   );
+}
+
+export async function listTasksForAdmin(limit = 200): Promise<AdminTask[]> {
+  const result = await getPool().query<{
+    id: string;
+    owner_id: string;
+    organization_id: string | null;
+    status: string;
+    stage: string | null;
+    progress: string | number;
+    result: AnalyzeResult | null;
+    error: string | null;
+    created_at: string | number;
+    started_at: string | number | null;
+    finished_at: string | number | null;
+    owner_email: string;
+    owner_name: string;
+    region_name: string;
+    persona: string;
+    vintage: string;
+    chateau: string | null;
+  }>(
+    `SELECT t.id,t.owner_id,t.organization_id,t.status,t.stage,t.progress,t.result,t.error,
+            t.created_at,t.started_at,t.finished_at,
+            u.email owner_email,u.name owner_name,
+            t.input->'region'->>'name' region_name,
+            t.input->>'persona' persona,
+            t.input->'timeframe'->>'start' vintage,
+            t.input->>'chateau' chateau
+     FROM analysis_tasks t JOIN users u ON u.id=t.owner_id
+     ORDER BY t.created_at DESC LIMIT $1`,
+    [limit],
+  );
+  return result.rows.map((row) => ({
+    ...rowToTask(row),
+    ownerEmail: row.owner_email,
+    ownerName: row.owner_name,
+    regionName: row.region_name ?? "—",
+    persona: row.persona ?? "—",
+    vintage: row.vintage ? row.vintage.slice(0, 4) : "—",
+    chateau: row.chateau,
+  }));
+}
+
+/** Cancel a queued task. Running/completed tasks are left untouched. */
+export async function cancelPendingTask(id: string): Promise<boolean> {
+  const result = await getPool().query(
+    "UPDATE analysis_tasks SET status='cancelled',stage='cancelled',error='Cancelled by administrator',finished_at=$2,heartbeat=$2 WHERE id=$1 AND status='pending'",
+    [id, Date.now()],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** Re-queue a failed task so the worker picks it up again. */
+export async function retryTask(id: string): Promise<boolean> {
+  const result = await getPool().query(
+    `UPDATE analysis_tasks SET status='pending',stage='queued',error=NULL,result=NULL,
+            started_at=NULL,finished_at=NULL,heartbeat=NULL,progress=0
+     WHERE id=$1 AND status='failed'`,
+    [id],
+  );
+  return (result.rowCount ?? 0) > 0;
 }

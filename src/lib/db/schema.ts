@@ -246,7 +246,7 @@ export const analysisTasks = pgTable(
   (table) => [
     check(
       "analysis_tasks_status_check",
-      sql`${table.status} IN ('pending','running','completed','failed')`,
+      sql`${table.status} IN ('pending','running','completed','failed','cancelled')`,
     ),
     index("idx_analysis_tasks_claim").on(table.status, table.createdAt),
     index("idx_analysis_tasks_owner_time").on(table.ownerId, table.createdAt),
