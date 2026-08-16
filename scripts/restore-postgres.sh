@@ -10,9 +10,14 @@ restore_args="--clean --if-exists --no-owner --no-acl"
 if [ -n "${DATABASE_URL:-}" ]; then
   # Managed / remote PostgreSQL: restore directly with the connection string.
   pg_restore --dbname="$DATABASE_URL" $restore_args "$backup"
-elif [ -n "${PGDATABASE:-}" ] || [ -n "${PGHOST:-}" ]; then
+elif [ -n "${PGDATABASE:-}" ]; then
   # Libpq environment (PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE) is set.
-  pg_restore $restore_args "$backup"
+  # pg_restore does not infer the target database from PGDATABASE — it must
+  # be passed explicitly via --dbname.
+  pg_restore --dbname="$PGDATABASE" $restore_args "$backup"
+elif [ -n "${PGHOST:-}" ]; then
+  echo "PGDATABASE must be set when using the libpq environment" >&2
+  exit 2
 else
   # Local compose stack fallback.
   cat "$backup" | docker compose exec -T postgres pg_restore --dbname=cuvee $restore_args
