@@ -2,7 +2,9 @@
 set -eu
 if [ "$#" -ne 1 ]; then echo "Usage: $0 backups/cuvee-TIMESTAMP.dump" >&2; exit 2; fi
 backup="$1";test -f "$backup";directory="$(cd "$(dirname "$backup")"&&pwd)";name="$(basename "$backup")"
-if [ -f "$backup.sha256" ];then (cd "$directory"&&shasum -a 256 -c "$name.sha256");fi
+if [ -f "$backup.sha256" ];then
+  (cd "$directory" && if command -v sha256sum >/dev/null 2>&1; then sha256sum -c "$name.sha256"; else shasum -a 256 -c "$name.sha256"; fi)
+fi
 
 restore_args="--clean --if-exists --no-owner --no-acl"
 if [ -n "${DATABASE_URL:-}" ]; then

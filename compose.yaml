@@ -74,7 +74,7 @@ services:
       - ./monitoring/loki/config.yaml:/etc/loki/local-config.yaml:ro
       - loki-data:/loki
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/ready"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3100/ready || curl -fsS http://127.0.0.1:3100/ready >/dev/null"]
       interval: 5s
       timeout: 3s
       retries: 15

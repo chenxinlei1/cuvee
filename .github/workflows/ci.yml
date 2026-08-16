@@ -126,11 +126,18 @@ jobs:
             sleep 2
           done
           curl -fsS http://localhost:3100/ready
-          for i in $(seq 1 30); do
-            curl -fsS -u admin:admin http://localhost:3001/api/health >/dev/null 2>&1 && break
+          for i in $(seq 1 60); do
+            if curl -fsS -u admin:admin http://localhost:3001/api/health >/dev/null 2>&1; then
+              echo "grafana ready after $((i * 2))s"
+              break
+            fi
             sleep 2
           done
-          curl -fsS -u admin:admin http://localhost:3001/api/health | grep -q '"database":"ok"'
+          curl -fsS -u admin:admin http://localhost:3001/api/health >/tmp/grafana-health.json ||
+            { echo "grafana health check failed"; docker compose ps; docker compose logs grafana --tail=80; docker compose logs loki --tail=20; exit 1; }
+          cat /tmp/grafana-health.json
+          grep -q '"database":"ok"' /tmp/grafana-health.json ||
+            { echo "grafana database not ok"; docker compose logs grafana --tail=80; exit 1; }
       - name: Verify Grafana provisioning
         run: |
           curl -fsS -u admin:admin http://localhost:3001/api/v1/provisioning/datasources | grep -q '"uid":"cuvee-prometheus"'
