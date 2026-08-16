@@ -35,12 +35,12 @@ export function AuthNav() {
           Platform Admin
         </Link>
       ) : null}
-      <span className="border-line hidden rounded-pill border px-3 py-2 text-xs md:inline">
+      <Link href="/account/security" className="border-line hidden rounded-pill border px-3 py-2 text-xs md:inline">
         {user.name} ·{" "}
         <span className="text-soft uppercase">
           {user.organizationType ?? "unassigned"} / {ROLE_LABELS[user.role]}
         </span>
-      </span>
+      </Link>
       <button
         className="chip"
         type="button"

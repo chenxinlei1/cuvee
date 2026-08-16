@@ -35,7 +35,7 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: email.trim(), password, remember }),
       });
       const data = (await response.json()) as { error?: string; user?: AuthUser };
       if (!response.ok) {
@@ -134,12 +134,12 @@ export default function LoginPage() {
                   />
                   {t("auth.login.remember")}
                 </label>
-                <button
-                  type="button"
+                <Link
+                  href="/forgot-password"
                   className="text-foreground underline-offset-4 hover:underline"
                 >
                   {t("auth.login.forgot")}
-                </button>
+                </Link>
               </div>
 
               {error ? (

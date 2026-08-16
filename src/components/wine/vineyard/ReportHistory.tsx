@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import { useI18n, useT } from "@/lib/i18n/Provider";
 import type { AnalyzeResult } from "@/lib/wine/types";
-import type { AuthUser, OrganizationType, ReportVisibility } from "@/lib/auth/types";
+import type { AuthUser, OrganizationType, ReportVisibility, Role } from "@/lib/auth/types";
 import { hasPermission } from "@/lib/auth/types";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import type { DictKey } from "@/lib/i18n/dict";
 const HISTORY_LIMIT = 20;
 interface Grant {
   id: string;
@@ -208,6 +209,7 @@ function ShareControls({
     shared: boolean;
   }) => void;
 }) {
+  const t = useT();
   const [kind, setKind] = useState<"user" | "organization">("user");
   const [target, setTarget] = useState("");
   const [expires, setExpires] = useState("");
@@ -259,7 +261,7 @@ function ShareControls({
               {kind === "user"
                 ? viewers.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} · {item.role}
+                      {item.name} · {t(ROLE_I18N_KEYS[item.role])}
                     </option>
                   ))
                 : organizations.map((item) => (
@@ -320,3 +322,10 @@ function ShareControls({
     </div>
   );
 }
+const ROLE_I18N_KEYS: Record<Role, DictKey> = {
+  platformAdmin: "auth.role.platform_admin",
+  wineryAdmin: "auth.role.winery_admin",
+  wineryStaff: "auth.role.winery_staff",
+  buyerAdmin: "auth.role.buyer_admin",
+  buyerStaff: "auth.role.buyer_staff",
+};

@@ -4,20 +4,20 @@ import Link from "next/link";
 import { useT } from "@/lib/i18n/Provider";
 import { AuthNav } from "@/components/auth/AuthNav";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
-import { hasPermission } from "@/lib/auth/types";
+import { canAccessTrade, canAccessVineyard } from "@/lib/auth/types";
 
 export function LocalizedNavLinks() {
   const t = useT();
-  const { user } = useCurrentUser();
+  const { user, ready } = useCurrentUser();
   return (
     <>
-      {!user || hasPermission(user, "analysis:run") ? (
+      {ready && user && canAccessVineyard(user) ? (
         <NavLink href="/vineyard">{t("nav.vineyard")}</NavLink>
       ) : null}
-      {!user || hasPermission(user, "analysis:run") ? (
+      {ready && user && canAccessTrade(user) ? (
         <NavLink href="/trade">{t("nav.trade")}</NavLink>
       ) : null}
-      {user ? <NavLink href="/reports">Reports</NavLink> : null}
+      {ready && user ? <NavLink href="/reports">Reports</NavLink> : null}
       <NavLink href="/blog">{t("nav.blog")}</NavLink>
       <span className="bg-line mx-2 h-4 w-px" />
       <AuthNav />

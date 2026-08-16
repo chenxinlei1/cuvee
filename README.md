@@ -32,6 +32,7 @@ https://github.com/user-attachments/assets/8740f19a-39b1-4bea-87ce-a74982b0f2c3
 | Node.js | `>=20` | `node -v` |
 | pnpm | `>=10` | `pnpm -v` (install via `npm install -g pnpm@latest` or `corepack enable`) |
 | Git | any | `git --version` |
+| PostgreSQL | `>=16` | `psql --version` or `docker compose version` |
 
 macOS / Linux / WSL2 all work. Native Windows isn't tested.
 
@@ -48,6 +49,16 @@ pnpm install
 ```bash
 cp .env.example .env.local
 ```
+
+Start PostgreSQL and initialize the schema:
+
+```bash
+docker compose up -d postgres
+pnpm db:migrate
+```
+
+`DATABASE_URL` is required at runtime. Managed PostgreSQL services should use their pooled
+connection string and the TLS settings required by the provider.
 
 **One** LLM provider is required (any one of OpenAI / Anthropic / Qwen / DeepSeek / Ollama). Retrieval and everything else degrade to fixtures or fallbacks when the matching key is missing.
 
@@ -91,12 +102,14 @@ cp .env.example .env.local
 
 #### Authentication and RBAC
 
-Set `CUVEE_AUTH_SECRET` to a long random value before deployment. Cuvée uses a signed,
-HttpOnly session cookie and a local SQLite user/audit database. The server enforces three
+Set `CUVEE_AUTH_SECRET` to a long random value before deployment. Production refuses to create
+sessions when it is missing. Cuvée uses a signed, HttpOnly, Secure session cookie and a
+PostgreSQL user/audit database. The server enforces five
 roles: `platformAdmin`, `wineryAdmin`, `wineryStaff`, `buyerAdmin`, and `buyerStaff`; hiding a button in the browser is never treated as
 authorization.
 
-Local demo accounts are seeded automatically:
+Local demo accounts are seeded automatically in development. Production only seeds them when
+`CUVEE_SEED_DEMO_USERS=true`; never enable that flag for a public deployment.
 
 | Role | Email | Password |
 |---|---|---|
@@ -128,6 +141,24 @@ capabilities. Winery users land in Vineyard, Buyer users land in Trade, and Plat
 instead of free text. Organization grants target the exact `type + organization name` pair, so a
 report shared with one buyer group is not exposed to every buyer organization.
 
+Authentication limits each email address to five failed sign-in attempts per 15-minute window.
+Users can change their password from `/account/security`; a successful change clears the current
+session. Platform Admins can issue a temporary password from the user manager. Both operations are
+audit-logged without storing either the old or new password in audit metadata.
+
+#### Import an existing SQLite installation
+
+The previous `data/.memory/auth.sqlite` file is retained as a rollback backup and is no longer
+used at runtime. After applying the PostgreSQL migration, import it once with:
+
+```bash
+pnpm db:import-sqlite
+```
+
+The importer runs in one transaction and preserves user IDs, password hashes, reports,
+documents, grants, audit logs, and login-attempt timestamps. It replaces the PostgreSQL
+application tables, so do not run it against a populated production database unintentionally.
+
 ### 3. Verify the environment
 
 ```bash
@@ -158,6 +189,10 @@ Pick a château on the map (or a region in the sidebar), click **Run analysis**,
 | `pnpm test:geo` | Smoke-test `geo_agent` directly |
 | `pnpm test:weather` | Smoke-test `weather_agent` directly |
 | `pnpm export:tavily-cache` | Dump the local SQLite cache to `data/tavily-cache-export.json` for repo-shipped warmup |
+| `pnpm db:generate` | Generate Drizzle SQL migrations after schema changes |
+| `pnpm db:migrate` | Apply pending PostgreSQL migrations |
+| `pnpm db:studio` | Inspect PostgreSQL with Drizzle Studio |
+| `pnpm db:import-sqlite` | One-time import from the legacy auth SQLite database |
 
 ### Run modes
 

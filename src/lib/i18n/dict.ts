@@ -116,6 +116,11 @@ export const DICT = {
     fr: "Impossible de joindre le service d'authentification.",
     en: "Unable to reach the authentication service.",
   },
+  "auth.role.platform_admin": { fr: "Administrateur de la plateforme", en: "Platform Admin" },
+  "auth.role.winery_admin": { fr: "Administrateur du domaine", en: "Winery Admin" },
+  "auth.role.winery_staff": { fr: "Opérateur de cave", en: "Cellar Operator" },
+  "auth.role.buyer_admin": { fr: "Administrateur acheteur", en: "Buyer Admin" },
+  "auth.role.buyer_staff": { fr: "Acheteur", en: "Buyer Staff" },
 
   // ── atlas + history ─────────────────────────────────────────────────
   "atlas.title": { fr: "Atlas des vins", en: "Wine Atlas" },

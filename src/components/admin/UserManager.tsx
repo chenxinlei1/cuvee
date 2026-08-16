@@ -24,6 +24,7 @@ export function UserManager({
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
 
   async function refresh() {
     const response = await fetch("/api/admin/users", { cache: "no-store" });
@@ -39,6 +40,7 @@ export function UserManager({
       status?: "pending" | "active" | "disabled";
       organizationType?: OrganizationType;
       organizationName?: string;
+      password?: string;
     },
   ) {
     setError(null);
@@ -52,6 +54,26 @@ export function UserManager({
       setError(data.error ?? "Update failed");
       return;
     }
+    await refresh();
+  }
+
+  async function resetPassword(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    const password = String(new FormData(event.currentTarget).get("password") ?? "");
+    await update(id, { password });
+    setResettingUserId(null);
+  }
+
+  async function removeUser(item: ManagedUser) {
+    if (!window.confirm(`Permanently delete ${item.name} (${item.email})? Their reports and documents will be transferred to your account.`)) return;
+    setError(null);
+    const response = await fetch(`/api/admin/users/${item.id}`, { method: "DELETE" });
+    const data = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setError(data.error ?? "Delete failed");
+      return;
+    }
+    setResettingUserId(null);
     await refresh();
   }
 
@@ -248,7 +270,7 @@ export function UserManager({
                 <option value="buyerStaff">{ROLE_LABELS.buyerStaff}</option>
               </select>
 
-              <div className="flex items-center justify-between gap-3 lg:justify-end">
+              <div className="flex flex-wrap items-center justify-between gap-3 lg:justify-end">
                 <StatusBadge status={item.status} />
                 {isCurrentUser ? (
                   <span className="text-soft text-[10px] font-bold uppercase tracking-wider">
@@ -271,7 +293,31 @@ export function UserManager({
                         : "Enable"}
                   </button>
                 )}
+                {!isCurrentUser ? (
+                  <button
+                    type="button"
+                    onClick={() => setResettingUserId((value) => value === item.id ? null : item.id)}
+                    className="decoration-line-strong text-xs font-semibold underline underline-offset-4 transition hover:text-accent"
+                  >
+                    Reset password
+                  </button>
+                ) : null}
+                {!isCurrentUser ? (
+                  <button
+                    type="button"
+                    onClick={() => void removeUser(item)}
+                    className="text-xs font-semibold text-red-500 underline underline-offset-4 transition hover:text-red-400"
+                  >
+                    Delete
+                  </button>
+                ) : null}
               </div>
+              {resettingUserId === item.id ? (
+                <form onSubmit={(event) => void resetPassword(event, item.id)} className="flex gap-2 lg:col-span-4 lg:justify-end">
+                  <input required name="password" type="password" minLength={12} autoComplete="new-password" placeholder="Temporary password · 12+ characters" className="admin-input max-w-sm" />
+                  <button className="rounded-full bg-foreground px-4 py-2 text-xs font-bold text-background">Save password</button>
+                </form>
+              ) : null}
             </article>
           );
         })}
