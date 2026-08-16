@@ -140,8 +140,8 @@ jobs:
             { echo "grafana database not ok"; docker compose logs grafana --tail=80; exit 1; }
       - name: Verify Grafana provisioning
         run: |
-          curl -fsS -u admin:admin http://localhost:3001/api/v1/provisioning/datasources | grep -q '"uid":"cuvee-prometheus"'
-          curl -fsS -u admin:admin http://localhost:3001/api/v1/provisioning/datasources | grep -q '"uid":"cuvee-loki"'
+          curl -fsS -u admin:admin http://localhost:3001/api/datasources | grep -q '"uid":"cuvee-prometheus"'
+          curl -fsS -u admin:admin http://localhost:3001/api/datasources | grep -q '"uid":"cuvee-loki"'
           RULES=$(curl -fsS -u admin:admin http://localhost:3001/api/v1/provisioning/alert-rules)
           for uid in cuvee-analysis-failure-rate cuvee-worker-heartbeat-stale cuvee-database-down cuvee-backup-stale cuvee-backup-failed; do
             echo "$RULES" | grep -q "\"uid\":\"$uid\"" || { echo "missing alert rule $uid" >&2; exit 1; }
