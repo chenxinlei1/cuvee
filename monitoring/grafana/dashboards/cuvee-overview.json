@@ -1,0 +1,164 @@
+{
+  "uid": "cuvee-overview",
+  "title": "Cuvée Overview",
+  "tags": ["cuvee", "observability"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Analysis throughput",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "cuvee-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(cuvee_analyses_total[5m]))",
+          "legendFormat": "analyses/s"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Analysis errors",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "cuvee-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(cuvee_analysis_errors_total[5m]))",
+          "legendFormat": "errors/s"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Analysis failure rate",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "cuvee-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(cuvee_analysis_errors_total[5m])) / clamp_min(sum(rate(cuvee_analyses_total[5m])), 1)",
+          "legendFormat": "failure rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 0.2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Task queue (pending + running)",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "cuvee-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "cuvee_tasks_pending", "legendFormat": "tasks" }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Worker heartbeat age",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "cuvee-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - cuvee_worker_heartbeat / 1000",
+          "legendFormat": "heartbeat age"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "red", "value": 120 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Database up",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "cuvee-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "cuvee_database_up", "legendFormat": "database" }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Process RSS",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "cuvee-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "cuvee_process_rss_bytes", "legendFormat": "rss" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Report activity",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "cuvee-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(cuvee_reports_saved_total[15m]))",
+          "legendFormat": "saved"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(cuvee_report_views_total[15m]))",
+          "legendFormat": "views"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(rate(cuvee_report_downloads_total[15m]))",
+          "legendFormat": "downloads"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    }
+  ]
+}

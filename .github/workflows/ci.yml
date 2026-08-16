@@ -106,3 +106,53 @@ jobs:
           curl -fsS http://127.0.0.1:3000/api/health
           curl -fsS http://127.0.0.1:3000/api/metrics | grep -q "cuvee_database_up 1"
           curl -fsS http://127.0.0.1:3000/api/metrics | grep -q "cuvee_process_uptime_seconds"
+
+  observability-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start full stack (app + postgres + loki + promtail + grafana)
+        run: docker compose up -d --build
+      - name: Wait for app, Loki and Grafana
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:3000/api/health >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:3000/api/health | grep -q '"database":true'
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3100/ready >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -fsS http://localhost:3100/ready
+          for i in $(seq 1 30); do
+            curl -fsS -u admin:admin http://localhost:3001/api/health >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -fsS -u admin:admin http://localhost:3001/api/health | grep -q '"database":"ok"'
+      - name: Verify Grafana provisioning
+        run: |
+          curl -fsS -u admin:admin http://localhost:3001/api/v1/provisioning/datasources | grep -q '"uid":"cuvee-prometheus"'
+          curl -fsS -u admin:admin http://localhost:3001/api/v1/provisioning/datasources | grep -q '"uid":"cuvee-loki"'
+          RULES=$(curl -fsS -u admin:admin http://localhost:3001/api/v1/provisioning/alert-rules)
+          for uid in cuvee-analysis-failure-rate cuvee-worker-heartbeat-stale cuvee-database-down cuvee-backup-stale cuvee-backup-failed; do
+            echo "$RULES" | grep -q "\"uid\":\"$uid\"" || { echo "missing alert rule $uid" >&2; exit 1; }
+          done
+          curl -fsS -u admin:admin http://localhost:3001/api/dashboards/uid/cuvee-overview | grep -q '"title":"Cuvée Overview"'
+      - name: Verify promtail → Loki log pipeline
+        run: |
+          sleep 15
+          python3 - <<'EOF'
+          import json, time, urllib.parse, urllib.request
+          query = '{container="cuvee-grafana-1"}'
+          url = "http://localhost:3100/loki/api/v1/query?" + urllib.parse.urlencode(
+              {"query": query, "limit": "5", "time": str(int(time.time()))}
+          )
+          data = json.load(urllib.request.urlopen(url, timeout=15))
+          streams = data["data"]["result"]
+          assert any(len(stream.get("values", [])) > 0 for stream in streams), (
+              f"no Grafana-container logs in Loki for {query}"
+          )
+          print("log pipeline OK:", json.dumps(streams, ensure_ascii=False)[:200])
+          EOF

@@ -173,6 +173,46 @@ without them, Sentry remains disabled. Logs are emitted as structured JSON with 
 cookies, and API keys redacted before writing; process gauges (uptime, heap, RSS) are exported
 alongside the application counters. CI uploads source maps when `SENTRY_AUTH_TOKEN` is configured.
 
+#### Observability stack (Loki + Grafana)
+
+`docker compose up -d --build` now also starts a self-hosted observability
+stack alongside the app:
+
+| Service | Port | Purpose |
+|---|---|---|
+| `app` | 3000 | Cuvée + `/api/metrics` (Prometheus text) |
+| `postgres` | 5432 | Application database |
+| `backup` | — | Daily verified dumps (also feeds the backup alert) |
+| `loki` | 3100 | Log aggregation (7-day retention) |
+| `promtail` | — | Docker container log scraping → Loki (JSON level/event labels; never scrapes Loki itself) |
+| `grafana` | 3001 | Dashboards + alerting (admin / `GRAFANA_ADMIN_PASSWORD`) |
+
+Grafana ships with a **Cuvée Overview** dashboard (analysis throughput,
+failure rate, task queue, worker heartbeat, database health, process RSS,
+report activity) and five provisioned alert rules:
+
+| Alert | Expression (abridged) | Severity |
+|---|---|---|
+| Analysis failure rate high | `errors / clamp_min(total,1) > 0.2` over 10m | critical |
+| Analysis worker heartbeat stale | heartbeat absent or > 120s | critical |
+| PostgreSQL unreachable | `cuvee_database_up == 0` for 2m | critical |
+| Database backup missing | no `cuvee-*.dump` log line in 25h | warning |
+| Database backup failed | backup container logs error/failure | critical |
+
+Alerts route to the `cuvee-alerts` contact point. Set `ALERT_WEBHOOK_URL` /
+`ALERT_EMAIL` (and `GF_SMTP_*` for email) in `.env` to receive
+notifications; until then they are visible in Grafana → Alerting. If
+`CUVEE_METRICS_TOKEN` is set, add the Authorization header to the Prometheus
+datasource (see the commented block in
+`monitoring/grafana/provisioning/datasources/datasources.yml`).
+
+The CI `observability-smoke` job boots the full compose stack and verifies
+that datasources, all five alert rules, and the dashboard are provisioned,
+and that promtail → Loki actually delivers container logs.
+
+For day-to-day operations (start/stop, alert changes, LogQL queries, disk
+cleanup, troubleshooting), see [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
+
 Restricted report grants can expire and independently allow download. Downloads are re-authorized
 at request time, use a five-minute signed URL, and are recorded in `report_access_logs`. Report
 managers can query `/api/reports/:id/access-log`.

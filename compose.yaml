@@ -65,6 +65,57 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  loki:
+    image: grafana/loki:3.2.2
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.2.2
+    command: ["-config.file=/etc/promtail/config.yaml"]
+    volumes:
+      - ./monitoring/promtail/config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SMTP_ENABLED: ${GF_SMTP_ENABLED:-false}
+      GF_SMTP_HOST: ${GF_SMTP_HOST:-}
+      GF_SMTP_USER: ${GF_SMTP_USER:-}
+      GF_SMTP_PASSWORD: ${GF_SMTP_PASSWORD:-}
+      GF_SMTP_FROM_ADDRESS: ${GF_SMTP_FROM_ADDRESS:-alerts@cuvee.demo}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-https://example.invalid/hooks/cuvee}
+      ALERT_EMAIL: ${ALERT_EMAIL:-alerts@example.invalid}
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   cuvee-postgres:
   cuvee-data:
+  loki-data:
+  grafana-data:

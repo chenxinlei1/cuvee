@@ -11,6 +11,7 @@ const config = [
   {
     ignores: [
       ".next/**",
+      ".next-*/**",
       "docs/ui-references/**",
       "data/**",
       "node_modules/**",

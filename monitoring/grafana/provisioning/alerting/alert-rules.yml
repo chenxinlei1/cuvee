@@ -1,0 +1,250 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Cuvée Alerts
+    folder: Cuvée
+    interval: 1m
+    rules:
+      # Analysis failure rate above 20% over 10 minutes.
+      - uid: cuvee-analysis-failure-rate
+        title: Analysis failure rate high
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: cuvee-prometheus
+            queryType: timeSeries
+            model:
+              expr: sum(rate(cuvee_analysis_errors_total[10m])) / clamp_min(sum(rate(cuvee_analyses_total[10m])), 1)
+              refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+          - refId: B
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: threshold
+              expression: A
+              refId: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.2]
+                  operator: and
+            relativeTimeRange:
+              from: 600
+              to: 0
+          - refId: C
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: reduce
+              expression: B
+              refId: C
+              reducer: last
+            relativeTimeRange:
+              from: 600
+              to: 0
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: Analysis failure rate above 20%
+          description: The ratio of failed to total analyses exceeded 20% over the last 10 minutes. Check /api/analyze task failures and LLM/retrieval provider health.
+
+      # Worker heartbeat absent or older than 120s (in-process worker dead
+      # or crashed; queued tasks would stall until stale re-claim kicks in).
+      - uid: cuvee-worker-heartbeat-stale
+        title: Analysis worker heartbeat stale
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: cuvee-prometheus
+            queryType: timeSeries
+            model:
+              expr: absent(cuvee_worker_heartbeat) or (time() - cuvee_worker_heartbeat / 1000) > 120
+              refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+          - refId: B
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: threshold
+              expression: A
+              refId: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator: and
+            relativeTimeRange:
+              from: 600
+              to: 0
+          - refId: C
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: reduce
+              expression: B
+              refId: C
+              reducer: last
+            relativeTimeRange:
+              from: 600
+              to: 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: Analysis worker heartbeat stale
+          description: The in-process analysis worker has not reported a heartbeat for 2 minutes. Tasks may be queued without execution.
+
+      # PostgreSQL health probe flips to 0.
+      - uid: cuvee-database-down
+        title: PostgreSQL unreachable
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: cuvee-prometheus
+            queryType: timeSeries
+            model:
+              expr: cuvee_database_up
+              refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+          - refId: B
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: threshold
+              expression: A
+              refId: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+                  operator: and
+            relativeTimeRange:
+              from: 600
+              to: 0
+          - refId: C
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: reduce
+              expression: B
+              refId: C
+              reducer: last
+            relativeTimeRange:
+              from: 600
+              to: 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: PostgreSQL unreachable
+          description: The /api/health database probe reports cuvee_database_up=0 for 2 minutes.
+
+      # No successful custom-format dump in the last 25 hours.
+      - uid: cuvee-backup-stale
+        title: Database backup missing
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: cuvee-loki
+            queryType: range
+            model:
+              expr: '{container="cuvee-backup-1"} |~ "cuvee-[0-9]{8}T[0-9]{6}Z\\.dump"'
+              refId: A
+              queryType: range
+            relativeTimeRange:
+              from: 90000
+              to: 0
+          - refId: B
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: threshold
+              expression: A
+              refId: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+                  operator: and
+            relativeTimeRange:
+              from: 90000
+              to: 0
+          - refId: C
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: reduce
+              expression: B
+              refId: C
+              reducer: last
+            relativeTimeRange:
+              from: 90000
+              to: 0
+        for: 30m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: Database backup missing
+          description: No successful pg_dump (cuvee-*.dump) was observed in the backup container logs over the last 25 hours.
+
+      # Backup container emitted an error / failure / fatal line.
+      - uid: cuvee-backup-failed
+        title: Database backup failed
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: cuvee-loki
+            queryType: range
+            model:
+              expr: '{container="cuvee-backup-1"} |~ "(?i)error|failed|fatal|could not"'
+              refId: A
+              queryType: range
+            relativeTimeRange:
+              from: 600
+              to: 0
+          - refId: B
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: threshold
+              expression: A
+              refId: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator: and
+            relativeTimeRange:
+              from: 600
+              to: 0
+          - refId: C
+            datasourceUid: __expr__
+            queryType: ""
+            model:
+              type: reduce
+              expression: B
+              refId: C
+              reducer: last
+            relativeTimeRange:
+              from: 600
+              to: 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: Database backup failed
+          description: The backup container logged an error/failure line in the last 5 minutes.

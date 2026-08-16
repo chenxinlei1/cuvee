@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Cuvée
+    orgId: 1
+    folder: Cuvée
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

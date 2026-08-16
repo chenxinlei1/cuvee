@@ -47,6 +47,7 @@ async function tick(): Promise<void> {
   if (ticking) return;
   ticking = true;
   try {
+    gauge("cuvee_worker_heartbeat", "Last worker heartbeat (epoch ms)", Date.now());
     gauge("cuvee_tasks_pending", "Queued or running analysis tasks", await countPendingTasks());
     if (Date.now() - lastCleanup > CLEANUP_INTERVAL_MS) {
       lastCleanup = Date.now();
