@@ -151,15 +151,24 @@ jobs:
         run: |
           sleep 15
           python3 - <<'EOF'
-          import json, time, urllib.parse, urllib.request
-          query = '{container="cuvee-grafana-1"}'
-          url = "http://localhost:3100/loki/api/v1/query?" + urllib.parse.urlencode(
-              {"query": query, "limit": "5", "time": str(int(time.time()))}
-          )
-          data = json.load(urllib.request.urlopen(url, timeout=15))
+          import json, time, urllib.error, urllib.parse, urllib.request
+
+          params = {
+              "query": '{container="cuvee-grafana-1"}',
+              "limit": "5",
+              "direction": "BACKWARD",
+              "start": str(int(time.time()) - 600),
+              "end": str(int(time.time())),
+          }
+          url = "http://localhost:3100/loki/api/v1/query_range?" + urllib.parse.urlencode(params)
+          try:
+              data = json.load(urllib.request.urlopen(url, timeout=15))
+          except urllib.error.HTTPError as exc:
+              print("loki query failed:", exc.read().decode("utf-8", "replace"))
+              raise
           streams = data["data"]["result"]
           assert any(len(stream.get("values", [])) > 0 for stream in streams), (
-              f"no Grafana-container logs in Loki for {query}"
+              f"no Grafana-container logs in Loki for {params['query']}"
           )
           print("log pipeline OK:", json.dumps(streams, ensure_ascii=False)[:200])
           EOF
