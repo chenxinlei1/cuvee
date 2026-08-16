@@ -14,10 +14,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /**
  * Drives the analyze flow with a workflow-style visual progression.
  *
- * The API call runs in parallel with phased state transitions so the user
- * sees the agents "wake up" in topology order even when the backend (demo
- * mode) responds instantly. Real-mode latency is absorbed inside phase 3
- * which awaits both the timer and the response promise.
+ * Analysis is submitted as an async task (POST /api/analyze → taskId) and
+ * polled via GET /api/analyze/[taskId] until completed. The poll runs in
+ * parallel with phased state transitions so the user sees the agents "wake
+ * up" in topology order even when the backend (demo mode) finishes instantly.
+ * Real-mode latency is absorbed inside phase 3 which awaits both the timer
+ * and the poll promise.
  *
  * Phases — keep in sync with the WorkflowTrace topology:
  *   0.  input        — set to "ok" immediately on click
@@ -74,16 +76,34 @@ export function useAnalysisFlow() {
     setWorkflowState({ ...INITIAL_WORKFLOW, input: "ok" });
 
     const apiPromise = (async (): Promise<{ok:true;data:AnalyzeResult}|{ok:false;status:number;message:string}> => {
-      const res = await fetch("/api/analyze", {
+      const submit = await fetch("/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: unknown };
-        return {ok:false,status:res.status,message:typeof j.error === "string" ? j.error : `HTTP ${res.status}`};
+      if (!submit.ok) {
+        const j = (await submit.json().catch(() => ({}))) as { error?: unknown };
+        return {ok:false,status:submit.status,message:typeof j.error === "string" ? j.error : `HTTP ${submit.status}`};
       }
-      return {ok:true,data:(await res.json()) as AnalyzeResult};
+      const { taskId } = (await submit.json()) as { taskId?: string };
+      if (!taskId) return { ok: false, status: 500, message: "Missing task id" };
+      const deadline = Date.now() + 5 * 60_000;
+      for (;;) {
+        const res = await fetch(`/api/analyze/${encodeURIComponent(taskId)}`, { cache: "no-store" });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: unknown };
+          return { ok: false, status: res.status, message: typeof j.error === "string" ? j.error : `HTTP ${res.status}` };
+        }
+        const { task } = (await res.json()) as {
+          task?: { status: string; result?: AnalyzeResult; error?: string | null };
+        };
+        if (task?.status === "completed" && task.result) return { ok: true, data: task.result };
+        if (task?.status === "failed")
+          return { ok: false, status: 500, message: task.error ?? "Analysis failed" };
+        if (Date.now() > deadline)
+          return { ok: false, status: 504, message: "Analysis timed out after 5 minutes" };
+        await sleep(1200);
+      }
     })().catch(() => ({ ok:false as const, status:0, message:"Unable to reach the analysis service." }));
 
     try {

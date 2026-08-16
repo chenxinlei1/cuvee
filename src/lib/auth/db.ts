@@ -1,12 +1,12 @@
 import "server-only";
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
-import type { AuthUser, OrganizationType, ReportVisibility, Role } from "./types";
+import type { AuthUser, OrganizationType, Permission, ReportVisibility, Role } from "./types";
 import { canManageReport, hasPermission } from "./types";
 import type { AnalyzeResult, UploadMeta } from "@/lib/wine/types";
 
 let pool: Pool | undefined;
-function getPool(): Pool {
+export function getPool(): Pool {
   const url = process.env.DATABASE_URL;
   if (!url)
     throw new Error(
@@ -14,6 +14,10 @@ function getPool(): Pool {
     );
   return (pool ??= new Pool({ connectionString: url, max: 10, idleTimeoutMillis: 30_000 }));
 }
+export async function closeDatabase(): Promise<void> {
+  if (pool) { const current = pool; pool = undefined; await current.end(); }
+}
+export async function databaseHealth():Promise<boolean>{try{await getPool().query("SELECT 1");return true;}catch{return false;}}
 async function rows<T extends QueryResultRow>(text: string, values: unknown[] = []): Promise<T[]> {
   return (await getPool().query<T>(text, values)).rows;
 }
@@ -56,6 +60,8 @@ interface UserRow extends QueryResultRow {
   name: string;
   password_hash: string;
   role: Role;
+  permissions: string[];
+  organization_id: string | null;
   organization_type: string | null;
   organization_name: string | null;
 }
@@ -65,17 +71,19 @@ function rowUser(row: Omit<UserRow, "password_hash">): AuthUser {
     email: row.email,
     name: row.name,
     role: row.role,
+    permissions: row.permissions as Permission[],
+    organizationId: row.organization_id ?? undefined,
     organizationType: (row.organization_type ?? undefined) as OrganizationType | undefined,
     organizationName: row.organization_name ?? undefined,
   };
 }
 
 export async function authenticate(email: string, password: string): Promise<AuthUser | null> {
-  const row = await one<UserRow>(
-    "SELECT id,email,name,password_hash,role,organization_type,organization_name FROM users WHERE lower(email)=lower($1) AND status='active'",
+  const row = await one<Pick<UserRow, "id" | "password_hash">>(
+    "SELECT id,password_hash FROM users WHERE lower(email)=lower($1) AND status='active'",
     [email],
   );
-  return row && verifyPassword(password, row.password_hash) ? rowUser(row) : null;
+  return row && verifyPassword(password, row.password_hash) ? findUserById(row.id) : null;
 }
 export async function emailVerificationState(email: string): Promise<boolean | null> {
   const row = await one<{ email_verified_at: string | null }>(
@@ -119,7 +127,11 @@ export async function userStatusByEmail(email: string): Promise<string | null> {
 }
 export async function findUserById(id: string): Promise<AuthUser | null> {
   const row = await one<Omit<UserRow, "password_hash">>(
-    "SELECT id,email,name,role,organization_type,organization_name FROM users WHERE id=$1 AND status='active'",
+    `SELECT u.id,u.email,u.name,ar.key role,o.id organization_id,o.type organization_type,o.name organization_name,
+      ARRAY_REMOVE(ARRAY_AGG(DISTINCT rp.permission_key),NULL) permissions
+     FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN access_roles ar ON ar.id=ur.role_id
+     LEFT JOIN organizations o ON o.id=ur.organization_id LEFT JOIN role_permissions rp ON rp.role_id=ar.id
+     WHERE u.id=$1 AND u.status='active' GROUP BY u.id,ar.key,o.id,o.type,o.name`,
     [id],
   );
   return row ? rowUser(row) : null;
@@ -128,7 +140,11 @@ export async function listUsers(): Promise<
   Array<AuthUser & { status: string; createdAt: number }>
 > {
   const data = await rows<Omit<UserRow, "password_hash"> & { status: string; created_at: string }>(
-    "SELECT id,email,name,role,status,organization_type,organization_name,created_at FROM users ORDER BY created_at",
+    `SELECT u.id,u.email,u.name,ar.key role,u.status,o.id organization_id,o.type organization_type,o.name organization_name,u.created_at,
+      ARRAY_REMOVE(ARRAY_AGG(DISTINCT rp.permission_key),NULL) permissions
+     FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN access_roles ar ON ar.id=ur.role_id
+     LEFT JOIN organizations o ON o.id=ur.organization_id LEFT JOIN role_permissions rp ON rp.role_id=ar.id
+     GROUP BY u.id,ar.key,o.id,o.type,o.name ORDER BY u.created_at`,
   );
   return data.map((r) => ({ ...rowUser(r), status: r.status, createdAt: Number(r.created_at) }));
 }
@@ -147,7 +163,16 @@ export async function createUser(input: {
     role = input.role ?? "buyerStaff",
     status = input.status ?? "pending";
   try {
-    await run(
+    await transaction(async (client) => {
+      const organizationId = randomUUID();
+      const organization = await client.query<{ id: string }>(
+        `INSERT INTO organizations(id,name,type,created_at) VALUES($1,$2,$3,$4)
+         ON CONFLICT(type,name) DO UPDATE SET name=excluded.name RETURNING id`,
+        [organizationId, input.organizationName?.trim(), input.organizationType, createdAt],
+      );
+      const orgId = organization.rows[0]?.id;
+      if (!orgId) throw new Error("ORGANIZATION_REQUIRED");
+      await client.query(
       "INSERT INTO users(id,email,name,password_hash,role,status,organization_type,organization_name,created_at,email_verified_at)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
       [
         id,
@@ -161,19 +186,19 @@ export async function createUser(input: {
         createdAt,
         input.emailVerified === false ? null : createdAt,
       ],
-    );
+      );
+      await client.query("INSERT INTO organization_members(organization_id,user_id,created_at) VALUES($1,$2,$3)", [orgId,id,createdAt]);
+      await client.query("INSERT INTO user_roles(user_id,role_id,organization_id,created_at) SELECT $1,id,$2,$3 FROM access_roles WHERE key=$4", [id,orgId,createdAt,role]);
+    });
   } catch (error) {
     if ((error as { code?: string }).code === "23505") throw new Error("EMAIL_EXISTS");
     throw error;
   }
+  const created = await findUserById(id);
+  if (!created) throw new Error("USER_CREATE_FAILED");
   return {
-    id,
-    email: input.email.trim().toLowerCase(),
-    name: input.name.trim(),
-    role,
+    ...created,
     status,
-    organizationType: input.organizationType,
-    organizationName: input.organizationName?.trim() || undefined,
     createdAt,
   };
 }
@@ -255,9 +280,13 @@ export async function createSession(userId: string, details: { userAgent?: strin
 export async function findUserBySession(token: string): Promise<AuthUser | null> {
   const now = Date.now();
   const row = await one<Omit<UserRow, "password_hash"> & { session_id: string }>(
-    `SELECT u.id,u.email,u.name,u.role,u.organization_type,u.organization_name,s.id session_id
-     FROM sessions s JOIN users u ON u.id=s.user_id
-     WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>$2 AND u.status='active'`,
+    `SELECT u.id,u.email,u.name,ar.key role,o.id organization_id,o.type organization_type,o.name organization_name,s.id session_id,
+      ARRAY_REMOVE(ARRAY_AGG(DISTINCT rp.permission_key),NULL) permissions
+     FROM sessions s JOIN users u ON u.id=s.user_id JOIN user_roles ur ON ur.user_id=u.id
+     JOIN access_roles ar ON ar.id=ur.role_id LEFT JOIN organizations o ON o.id=ur.organization_id
+     LEFT JOIN role_permissions rp ON rp.role_id=ar.id
+     WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>$2 AND u.status='active'
+     GROUP BY u.id,ar.key,o.id,o.type,o.name,s.id`,
     [hashToken(token), now],
   );
   if (!row) return null;
@@ -294,18 +323,21 @@ export async function updateUser(
     organizationName?: string;
   },
 ): Promise<boolean> {
-  return (
-    (await run(
-      "UPDATE users SET role=COALESCE($1,role),status=COALESCE($2,status),organization_type=COALESCE($3,organization_type),organization_name=COALESCE($4,organization_name)WHERE id=$5",
-      [
-        patch.role ?? null,
-        patch.status ?? null,
-        patch.organizationType ?? null,
-        patch.organizationName ?? null,
-        id,
-      ],
-    )) > 0
-  );
+  return transaction(async (client) => {
+    const current = await client.query<{ role: Role; organization_type: OrganizationType; organization_name: string }>("SELECT role,organization_type,organization_name FROM users WHERE id=$1 FOR UPDATE", [id]);
+    const user = current.rows[0];
+    if (!user) return false;
+    const role = patch.role ?? user.role, type = patch.organizationType ?? user.organization_type, name = patch.organizationName ?? user.organization_name;
+    const organization = await client.query<{ id: string }>(`INSERT INTO organizations(id,name,type,created_at) VALUES($1,$2,$3,$4) ON CONFLICT(type,name) DO UPDATE SET name=excluded.name RETURNING id`, [randomUUID(),name,type,Date.now()]);
+    const organizationId = organization.rows[0]?.id;
+    if (!organizationId) return false;
+    await client.query("UPDATE users SET role=$1,status=COALESCE($2,status),organization_type=$3,organization_name=$4 WHERE id=$5", [role,patch.status??null,type,name,id]);
+    await client.query("DELETE FROM organization_members WHERE user_id=$1", [id]);
+    await client.query("INSERT INTO organization_members(organization_id,user_id,created_at) VALUES($1,$2,$3)", [organizationId,id,Date.now()]);
+    await client.query("DELETE FROM user_roles WHERE user_id=$1", [id]);
+    await client.query("INSERT INTO user_roles(user_id,role_id,organization_id,created_at) SELECT $1,id,$2,$3 FROM access_roles WHERE key=$4", [id,organizationId,Date.now(),role]);
+    return true;
+  });
 }
 export async function changePassword(
   userId: string,
@@ -378,7 +410,11 @@ export async function deleteUser(
 export async function listShareTargets(): Promise<AuthUser[]> {
   return (
     await rows<Omit<UserRow, "password_hash">>(
-      "SELECT id,email,name,role,organization_type,organization_name FROM users WHERE status='active' ORDER BY name",
+      `SELECT u.id,u.email,u.name,ar.key role,o.id organization_id,o.type organization_type,o.name organization_name,
+       ARRAY_REMOVE(ARRAY_AGG(DISTINCT rp.permission_key),NULL) permissions
+       FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN access_roles ar ON ar.id=ur.role_id
+       LEFT JOIN organizations o ON o.id=ur.organization_id LEFT JOIN role_permissions rp ON rp.role_id=ar.id
+       WHERE u.status='active' GROUP BY u.id,ar.key,o.id,o.type,o.name ORDER BY u.name`,
     )
   ).map(rowUser);
 }
@@ -388,11 +424,11 @@ export interface OrganizationTarget {
   name: string;
 }
 export async function listOrganizationTargets(): Promise<OrganizationTarget[]> {
-  const data = await rows<{ organization_type: OrganizationType; organization_name: string }>(
-    "SELECT DISTINCT organization_type,organization_name FROM users WHERE status='active' AND organization_type IS NOT NULL AND organization_name IS NOT NULL ORDER BY organization_name",
+  const data = await rows<{ id: string; organization_type: OrganizationType; organization_name: string }>(
+    "SELECT id,type organization_type,name organization_name FROM organizations ORDER BY name",
   );
   return data.map((r) => ({
-    key: `${r.organization_type}::${r.organization_name}`,
+    key: r.id,
     type: r.organization_type,
     name: r.organization_name,
   }));
@@ -427,6 +463,33 @@ export async function listAuditLogs(
   }));
 }
 
+export interface AccessRoleDefinition {
+  key: Role;
+  name: string;
+  permissions: Permission[];
+}
+export async function listAccessRoles(): Promise<AccessRoleDefinition[]> {
+  const data = await rows<{ key: Role; name: string; permissions: string[] }>(
+    `SELECT r.key,r.name,ARRAY_REMOVE(ARRAY_AGG(rp.permission_key ORDER BY rp.permission_key),NULL) permissions
+     FROM access_roles r LEFT JOIN role_permissions rp ON rp.role_id=r.id GROUP BY r.id ORDER BY r.created_at`,
+  );
+  return data.map((role) => ({ ...role, permissions: role.permissions as Permission[] }));
+}
+export async function listPermissionDefinitions(): Promise<Array<{ key: Permission; description: string }>> {
+  return rows<{ key: Permission; description: string }>("SELECT key,description FROM permissions ORDER BY key");
+}
+export async function setAccessRolePermissions(roleKey: Role, permissionKeys: Permission[]): Promise<boolean> {
+  return transaction(async (client) => {
+    const role = await client.query<{ id: string }>("SELECT id FROM access_roles WHERE key=$1 FOR UPDATE", [roleKey]);
+    const roleId = role.rows[0]?.id;
+    if (!roleId) return false;
+    if (roleKey === "platformAdmin" && (!permissionKeys.includes("role:manage") || !permissionKeys.includes("user:manage"))) throw new Error("PLATFORM_ADMIN_PROTECTED");
+    await client.query("DELETE FROM role_permissions WHERE role_id=$1", [roleId]);
+    if (permissionKeys.length) await client.query("INSERT INTO role_permissions(role_id,permission_key) SELECT $1,key FROM permissions WHERE key=ANY($2::text[])", [roleId,permissionKeys]);
+    return true;
+  });
+}
+
 export interface ReportGrant {
   id: string;
   targetKind: "user" | "organization";
@@ -444,14 +507,67 @@ export interface StoredReport {
   canManage: boolean;
   canDownload: boolean;
 }
-export async function saveReport(ownerId: string, result: AnalyzeResult): Promise<string> {
+interface ReportRow extends QueryResultRow {
+  id: string;
+  owner_id: string;
+  organization_id: string;
+  result_json: AnalyzeResult;
+  created_at: string;
+  visibility: ReportVisibility;
+}
+async function reportGrants(reportId: string): Promise<ReportGrant[]> {
+  return (
+    await rows<{
+      id: string;
+      target_kind: "user" | "organization";
+      target_value: string;
+      expires_at: string | null;
+      can_download: boolean;
+    }>(
+      "SELECT id,target_kind,target_value,expires_at,can_download FROM report_grants WHERE report_id=$1 ORDER BY created_at DESC",
+      [reportId],
+    )
+  ).map((g) => ({
+    id: g.id,
+    targetKind: g.target_kind,
+    targetValue: g.target_value,
+    expiresAt: g.expires_at === null ? null : Number(g.expires_at),
+    canDownload: g.can_download,
+  }));
+}
+function activeGrantFor(grants: ReportGrant[], user: AuthUser): ReportGrant | undefined {
+  const org = user.organizationId ?? "";
+  return grants.find(
+    (g) =>
+      (!g.expiresAt || g.expiresAt > Date.now()) &&
+      ((g.targetKind === "user" && g.targetValue === user.id) ||
+        (g.targetKind === "organization" && g.targetValue === org)),
+  );
+}
+function decorateReport(row: ReportRow, user: AuthUser, grants: ReportGrant[]): StoredReport {
+  const matching = activeGrantFor(grants, user);
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    result: row.result_json,
+    savedAt: new Date(Number(row.created_at)).toISOString(),
+    visibility: row.visibility,
+    grants,
+    canManage: canManageReport(user, row.owner_id, row.organization_id),
+    canDownload:
+      canManageReport(user, row.owner_id, row.organization_id) || Boolean(matching?.canDownload),
+  };
+}
+export async function saveReport(user: AuthUser, result: AnalyzeResult): Promise<string> {
+  if (!user.organizationId) throw new Error("ORGANIZATION_REQUIRED");
   const id = randomUUID(),
     now = Date.now();
   const saved = await one<{ id: string }>(
-    `INSERT INTO reports(id,owner_id,region_id,region_name,vintage,risk_score,quality_band,result_json,generated_at,created_at,updated_at,visibility)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,'private')ON CONFLICT(owner_id,generated_at)DO UPDATE SET result_json=excluded.result_json,risk_score=excluded.risk_score,quality_band=excluded.quality_band,updated_at=excluded.updated_at RETURNING id`,
+    `INSERT INTO reports(id,owner_id,organization_id,region_id,region_name,vintage,risk_score,quality_band,result_json,generated_at,created_at,updated_at,visibility)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,'private')ON CONFLICT(owner_id,generated_at)DO UPDATE SET result_json=excluded.result_json,risk_score=excluded.risk_score,quality_band=excluded.quality_band,organization_id=excluded.organization_id,updated_at=excluded.updated_at RETURNING id`,
     [
       id,
-      ownerId,
+      user.id,
+      user.organizationId,
       result.region.id,
       result.region.name,
       result.timeframe.start.slice(0, 4),
@@ -465,110 +581,57 @@ export async function saveReport(ownerId: string, result: AnalyzeResult): Promis
   return saved?.id ?? id;
 }
 export async function listReports(user: AuthUser): Promise<StoredReport[]> {
-  const org =
-    user.organizationType && user.organizationName
-      ? `${user.organizationType}::${user.organizationName}`
-      : "";
+  const org = user.organizationId ?? "";
   const data = hasPermission(user, "report:read:any")
-    ? await rows<{
-        id: string;
-        owner_id: string;
-        result_json: AnalyzeResult;
-        created_at: string;
-        visibility: ReportVisibility;
-      }>(
-        "SELECT id,owner_id,result_json,created_at,visibility FROM reports ORDER BY created_at DESC LIMIT 100",
+    ? await rows<ReportRow>(
+        "SELECT id,owner_id,organization_id,result_json,created_at,visibility FROM reports ORDER BY created_at DESC LIMIT 100",
       )
-    : await rows<{
-        id: string;
-        owner_id: string;
-        result_json: AnalyzeResult;
-        created_at: string;
-        visibility: ReportVisibility;
-      }>(
-        `SELECT DISTINCT r.id,r.owner_id,r.result_json,r.created_at,r.visibility FROM reports r LEFT JOIN report_grants g ON g.report_id=r.id AND(g.expires_at IS NULL OR g.expires_at>$1)WHERE r.owner_id=$2 OR r.visibility='workspace' OR(r.visibility='restricted' AND((g.target_kind='user' AND g.target_value=$2::text)OR(g.target_kind='organization' AND g.target_value=$3)))ORDER BY r.created_at DESC LIMIT 20`,
+    : await rows<ReportRow>(
+        `SELECT DISTINCT r.id,r.owner_id,r.organization_id,r.result_json,r.created_at,r.visibility FROM reports r LEFT JOIN report_grants g ON g.report_id=r.id AND(g.expires_at IS NULL OR g.expires_at>$1)WHERE r.owner_id=$2 OR(r.visibility='workspace' AND r.organization_id=$3)OR(r.visibility='restricted' AND((g.target_kind='user' AND g.target_value=$2::text)OR(g.target_kind='organization' AND g.target_value=$3::text)))ORDER BY r.created_at DESC LIMIT 20`,
         [Date.now(), user.id, org],
       );
   return Promise.all(
     data.map(async (r) => {
-      const grants = (
-        await rows<{
-          id: string;
-          target_kind: "user" | "organization";
-          target_value: string;
-          expires_at: string | null;
-          can_download: boolean;
-        }>(
-          "SELECT id,target_kind,target_value,expires_at,can_download FROM report_grants WHERE report_id=$1 ORDER BY created_at DESC",
-          [r.id],
-        )
-      ).map((g) => ({
-        id: g.id,
-        targetKind: g.target_kind,
-        targetValue: g.target_value,
-        expiresAt: g.expires_at === null ? null : Number(g.expires_at),
-        canDownload: g.can_download,
-      }));
-      const matching = grants.find(
-        (g) =>
-          (!g.expiresAt || g.expiresAt > Date.now()) &&
-          ((g.targetKind === "user" && g.targetValue === user.id) ||
-            (g.targetKind === "organization" && g.targetValue === org)),
-      );
-      return {
-        id: r.id,
-        ownerId: r.owner_id,
-        result: r.result_json,
-        savedAt: new Date(Number(r.created_at)).toISOString(),
-        visibility: r.visibility,
-        grants,
-        canManage: canManageReport(user, r.owner_id),
-        canDownload: canManageReport(user, r.owner_id) || Boolean(matching?.canDownload),
-      };
+      return decorateReport(r, user, await reportGrants(r.id));
     }),
   );
 }
-export async function deleteReport(user: AuthUser, id: string): Promise<boolean> {
-  const report = await one<{ owner_id: string }>("SELECT owner_id FROM reports WHERE id=$1", [id]);
-  if (!report || !canManageReport(user, report.owner_id)) return false;
-  return (await run("DELETE FROM reports WHERE id=$1", [id])) > 0;
+/** Exact single-report lookup honoring visibility + grants (no list truncation). */
+export async function findReportForUser(
+  user: AuthUser,
+  id: string,
+): Promise<StoredReport | null> {
+  const org = user.organizationId ?? "";
+  const row = hasPermission(user, "report:read:any")
+    ? await one<ReportRow>(
+        "SELECT id,owner_id,organization_id,result_json,created_at,visibility FROM reports WHERE id=$1",
+        [id],
+      )
+    : await one<ReportRow>(
+        `SELECT DISTINCT r.id,r.owner_id,r.organization_id,r.result_json,r.created_at,r.visibility FROM reports r
+         LEFT JOIN report_grants g ON g.report_id=r.id AND (g.expires_at IS NULL OR g.expires_at>$1)
+         WHERE r.id=$2 AND (r.owner_id=$3 OR (r.visibility='workspace' AND r.organization_id=$4)
+           OR (r.visibility='restricted' AND ((g.target_kind='user' AND g.target_value=$3::text)
+             OR (g.target_kind='organization' AND g.target_value=$4::text))))
+         ORDER BY r.created_at DESC LIMIT 1`,
+        [Date.now(), id, user.id, org],
+      );
+  return row ? decorateReport(row, user, await reportGrants(row.id)) : null;
 }
-export async function setReportShare(
-  actor: AuthUser,
-  reportId: string,
-  targetUserId: string,
-  shared: boolean,
-): Promise<boolean> {
-  const report = await one<{ owner_id: string }>("SELECT owner_id FROM reports WHERE id=$1", [
-    reportId,
-  ]);
-  if (
-    !report ||
-    !canManageReport(actor, report.owner_id) ||
-    !(await one("SELECT id FROM users WHERE id=$1 AND status='active'", [targetUserId]))
-  )
-    return false;
-  if (shared)
-    await run(
-      "INSERT INTO report_permissions(report_id,user_id,permission,granted_by,created_at)VALUES($1,$2,'view',$3,$4)ON CONFLICT(report_id,user_id)DO UPDATE SET granted_by=excluded.granted_by,created_at=excluded.created_at",
-      [reportId, targetUserId, actor.id, Date.now()],
-    );
-  else
-    await run("DELETE FROM report_permissions WHERE report_id=$1 AND user_id=$2", [
-      reportId,
-      targetUserId,
-    ]);
-  return true;
+export async function deleteReport(user: AuthUser, id: string): Promise<boolean> {
+  const report = await one<{ owner_id: string; organization_id: string }>("SELECT owner_id,organization_id FROM reports WHERE id=$1", [id]);
+  if (!report || !canManageReport(user, report.owner_id, report.organization_id)) return false;
+  return (await run("DELETE FROM reports WHERE id=$1", [id])) > 0;
 }
 export async function setReportVisibility(
   actor: AuthUser,
   reportId: string,
   visibility: ReportVisibility,
 ): Promise<boolean> {
-  const report = await one<{ owner_id: string }>("SELECT owner_id FROM reports WHERE id=$1", [
+  const report = await one<{ owner_id: string; organization_id: string }>("SELECT owner_id,organization_id FROM reports WHERE id=$1", [
     reportId,
   ]);
-  if (!report || !canManageReport(actor, report.owner_id)) return false;
+  if (!report || !canManageReport(actor, report.owner_id, report.organization_id)) return false;
   const changed = await run("UPDATE reports SET visibility=$1,updated_at=$2 WHERE id=$3", [
     visibility,
     Date.now(),
@@ -589,11 +652,11 @@ export async function setReportGrant(
     shared: boolean;
   },
 ): Promise<boolean> {
-  const report = await one<{ owner_id: string; visibility: ReportVisibility }>(
-    "SELECT owner_id,visibility FROM reports WHERE id=$1",
+  const report = await one<{ owner_id: string; organization_id: string; visibility: ReportVisibility }>(
+    "SELECT owner_id,organization_id,visibility FROM reports WHERE id=$1",
     [reportId],
   );
-  if (!report || !canManageReport(actor, report.owner_id) || report.visibility !== "restricted")
+  if (!report || !canManageReport(actor, report.owner_id, report.organization_id) || report.visibility !== "restricted")
     return false;
   if (
     input.targetKind === "user" &&
@@ -601,15 +664,7 @@ export async function setReportGrant(
   )
     return false;
   if (input.targetKind === "organization") {
-    const [type, name] = input.targetValue.split("::");
-    if (
-      !type ||
-      !name ||
-      !(await one(
-        "SELECT id FROM users WHERE status='active' AND organization_type=$1 AND organization_name=$2 LIMIT 1",
-        [type, name],
-      ))
-    )
+    if (!(await one("SELECT id FROM organizations WHERE id=$1", [input.targetValue])))
       return false;
   }
   if (input.shared)
@@ -634,7 +689,18 @@ export async function setReportGrant(
   return true;
 }
 export async function canDownloadReport(user: AuthUser, reportId: string): Promise<boolean> {
-  return (await listReports(user)).some((r) => r.id === reportId && r.canDownload);
+  return (await findReportForUser(user, reportId))?.canDownload ?? false;
+}
+export async function getDownloadableReport(user: AuthUser, reportId: string): Promise<StoredReport | null> {
+  const report = await findReportForUser(user, reportId);
+  return report?.canDownload ? report : null;
+}
+export async function recordReportAccess(input:{reportId:string;userId:string|null;action:"view"|"download"|"share"|"revoke";ipAddress?:string;userAgent?:string}):Promise<void>{
+  await run("INSERT INTO report_access_logs(id,report_id,user_id,action,ip_address,user_agent,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)",[randomUUID(),input.reportId,input.userId,input.action,input.ipAddress??null,input.userAgent??null,Date.now()]);
+}
+export async function listReportAccessLogs(actor:AuthUser,reportId:string){
+  const report=await one<{owner_id:string;organization_id:string}>("SELECT owner_id,organization_id FROM reports WHERE id=$1",[reportId]);if(!report||!canManageReport(actor,report.owner_id,report.organization_id))return null;
+  return rows<{id:string;user_id:string|null;action:string;ip_address:string|null;user_agent:string|null;created_at:string}>("SELECT id,user_id,action,ip_address,user_agent,created_at FROM report_access_logs WHERE report_id=$1 ORDER BY created_at DESC LIMIT 200",[reportId]);
 }
 export interface StoredDocument extends UploadMeta {
   id: string;
@@ -642,17 +708,19 @@ export interface StoredDocument extends UploadMeta {
   createdAt: number;
 }
 export async function saveDocument(
-  ownerId: string,
+  user: AuthUser,
   document: UploadMeta,
   contentHash: string,
 ): Promise<StoredDocument> {
+  if (!user.organizationId) throw new Error("ORGANIZATION_REQUIRED");
   const id = randomUUID(),
     now = Date.now();
   const saved = await one<{ id: string }>(
-    "INSERT INTO documents(id,owner_id,filename,size,mime,content,content_hash,created_at)VALUES($1,$2,$3,$4,$5,$6,$7,$8)ON CONFLICT(owner_id,content_hash)DO UPDATE SET filename=excluded.filename,mime=excluded.mime RETURNING id",
+    "INSERT INTO documents(id,owner_id,organization_id,filename,size,mime,content,content_hash,created_at)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)ON CONFLICT(owner_id,content_hash)DO UPDATE SET filename=excluded.filename,mime=excluded.mime,organization_id=excluded.organization_id RETURNING id",
     [
       id,
-      ownerId,
+      user.id,
+      user.organizationId,
       document.name,
       document.size,
       document.mime,
@@ -663,7 +731,7 @@ export async function saveDocument(
   );
   return {
     id: saved?.id ?? id,
-    ownerId,
+    ownerId: user.id,
     name: document.name,
     size: document.size,
     mime: document.mime,
@@ -690,7 +758,7 @@ export async function listDocuments(user: AuthUser): Promise<StoredDocument[]> {
         mime: string;
         content: string;
         created_at: string;
-      }>("SELECT * FROM documents WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 50", [user.id]);
+      }>("SELECT * FROM documents WHERE organization_id=$1 ORDER BY created_at DESC LIMIT 50", [user.organizationId]);
   return data.map((r) => ({
     id: r.id,
     ownerId: r.owner_id,
@@ -707,8 +775,8 @@ export async function deleteDocument(user: AuthUser, id: string): Promise<boolea
     (await run(
       any
         ? "DELETE FROM documents WHERE id=$1"
-        : "DELETE FROM documents WHERE id=$1 AND owner_id=$2",
-      any ? [id] : [id, user.id],
+        : "DELETE FROM documents WHERE id=$1 AND organization_id=$2",
+      any ? [id] : [id, user.organizationId],
     )) > 0
   );
 }

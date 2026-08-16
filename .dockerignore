@@ -1,0 +1,12 @@
+.git
+.github
+.next
+.next-*
+node_modules
+.pnpm-store
+.env*
+!.env.example
+data/.memory
+data/.cache
+backups
+*.log

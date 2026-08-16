@@ -1,6 +1,6 @@
 import "server-only";
 import { readFileSync } from "node:fs";
-import path from "node:path";
+import { dataDir } from "@/lib/data-path";
 
 /**
  * 1855-classed Bordeaux châteaux dataset loader.
@@ -66,10 +66,9 @@ export function loadChateaux(): Chateau[] {
   if (_all !== null) return _all;
   let loaded: Chateau[] = [];
   try {
-    const root = process.cwd();
-    const baseRows = parseCsv(readFileSync(path.join(root, "data/chateaux.csv"), "utf-8"));
-    const geoRows = parseCsv(readFileSync(path.join(root, "data/static_geo.csv"), "utf-8"));
-    const microRows = parseCsv(readFileSync(path.join(root, "data/microtopo.csv"), "utf-8"));
+    const baseRows = parseCsv(readFileSync(dataDir("chateaux.csv"), "utf-8"));
+    const geoRows = parseCsv(readFileSync(dataDir("static_geo.csv"), "utf-8"));
+    const microRows = parseCsv(readFileSync(dataDir("microtopo.csv"), "utf-8"));
 
     const geoByName = indexBy(geoRows, "chateau");
     const microByName = indexBy(microRows, "chateau");

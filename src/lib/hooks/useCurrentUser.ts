@@ -6,7 +6,7 @@ export function useCurrentUser() {
   const [user,setUser]=useState<AuthUser|null>(null);
   const [ready,setReady]=useState(false);
   const refresh=useCallback(async()=>{
-    try { const response=await fetch("/api/auth/me",{cache:"no-store"}); setUser(response.ok?((await response.json()) as {user:AuthUser}).user:null); }
+    try { const response=await fetch("/api/auth/me",{cache:"no-store"}); const value=response.ok?((await response.json()) as {user:AuthUser}).user:null;setUser(value?{...value,permissions:Array.isArray(value.permissions)?value.permissions:[]}:null); }
     catch { setUser(null); }
     finally { setReady(true); }
   },[]);

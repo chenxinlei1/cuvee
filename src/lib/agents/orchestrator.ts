@@ -152,7 +152,12 @@ function cachePut(key: string, result: AnalyzeResult): void {
 
 export async function analyze(
   input: AnalyzeInput,
-  opts: { signal?: AbortSignal; ownerId?: string } = {},
+  opts: {
+    signal?: AbortSignal;
+    ownerId?: string;
+    /** Phase progress callback used by the async task worker. */
+    onPhase?: (phase: { stage: string; progress: number }) => void;
+  } = {},
 ): Promise<AnalyzeResult> {
   if (isDemoMode) return demoWineAnalysis(input);
   if (!hasLLM()) {
@@ -164,6 +169,7 @@ export async function analyze(
   const key = cacheKey(input, ownerId);
   const cached = cacheGet(key) ?? (await getPersistentAnalysisResult(key));
   if (cached) return cached;
+  const onPhase = opts.onPhase;
 
   const today = new Date().toISOString().slice(0, 10);
   const isBacktest = input.timeframe.end < today;
@@ -195,7 +201,9 @@ export async function analyze(
   // LLM's ability to reorder or skip sub-agents based on the user
   // question. That trade-off is acceptable for the live demo only.
   if (isDemoFast) {
-    const result = await directDispatch(input, ctx, trace);
+    onPhase?.({ stage: "evidence", progress: 10 });
+    const result = await directDispatch(input, ctx, trace, onPhase);
+    onPhase?.({ stage: "complete", progress: 100 });
     if (!result.isDemoOrPartial) {
       cachePut(key, result);
       void putPersistentAnalysisResult(key, result);
@@ -205,6 +213,7 @@ export async function analyze(
   }
 
   const llm = defaultLLM();
+  onPhase?.({ stage: "orchestrating", progress: 10 });
 
   const bootstrap = [
     `Region: ${input.region.name} (id=${input.region.id}, parent=${input.region.parent})`,
@@ -284,6 +293,7 @@ export async function analyze(
   }
 
   const result = harvest(input, trace);
+  onPhase?.({ stage: "complete", progress: 100 });
   // Only cache non-partial results — partials (failed sub-agents, missing
   // keys) shouldn't poison the cache for future requests.
   if (!result.isDemoOrPartial) {
@@ -368,6 +378,7 @@ async function directDispatch(
   input: AnalyzeInput,
   ctx: AgentContext,
   trace: AgentResult[],
+  onPhase?: (phase: { stage: string; progress: number }) => void,
 ): Promise<AnalyzeResult> {
   const weatherInput = {
     regionId: input.region.id,
@@ -425,6 +436,7 @@ async function directDispatch(
     runAgentSafely(geoAgent as AnyAgent, geoInput, ctx),
     runAgentSafely(tavilyAgent as AnyAgent, tavilyInput, ctx),
   ]);
+  onPhase?.({ stage: "extracting", progress: 40 });
 
   // Phase 2 — extraction with all three signals.
   const extraction = await runAgentSafely(
@@ -440,6 +452,7 @@ async function directDispatch(
   );
 
   trace.push(weather, geo, tavily, extraction);
+  onPhase?.({ stage: "writing", progress: 70 });
 
   // Phase 3 — feature_agent reads from extraction's score / band / drivers.
   const ext = extraction.data as Partial<ExtractionOutput> | undefined;

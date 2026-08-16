@@ -1,7 +1,7 @@
 import "server-only";
 import { mkdirSync, readFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { dataDir } from "@/lib/data-path";
 
 export const TAVILY_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -47,9 +47,9 @@ async function getDatabase(): Promise<import("node:sqlite").DatabaseSync | null>
   if (database !== undefined) return database;
   try {
     const { DatabaseSync } = await import("node:sqlite");
-    const cacheDir = join(process.cwd(), "data", ".cache");
+    const cacheDir = dataDir(".cache");
     mkdirSync(cacheDir, { recursive: true });
-    database = new DatabaseSync(join(cacheDir, "tavily-search.sqlite"));
+    database = new DatabaseSync(dataDir(".cache", "tavily-search.sqlite"));
     database.exec(`
       CREATE TABLE IF NOT EXISTS tavily_search_cache (
         cache_key TEXT PRIMARY KEY,
@@ -93,7 +93,7 @@ function hydrateFromExport(db: import("node:sqlite").DatabaseSync): void {
   if (hydratedFromExport) return;
   hydratedFromExport = true;
 
-  const exportPath = join(process.cwd(), "data", "tavily-cache-export.json");
+  const exportPath = dataDir("tavily-cache-export.json");
   if (!existsSync(exportPath)) return;
 
   try {

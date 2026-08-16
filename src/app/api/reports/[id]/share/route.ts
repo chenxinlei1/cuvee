@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/types";
-import { setReportGrant, writeAuditLog } from "@/lib/auth/db";
+import { recordReportAccess, setReportGrant, writeAuditLog } from "@/lib/auth/db";
 const Body = z.object({
   targetKind: z.enum(["user", "organization"]),
   targetValue: z.string().min(1),
@@ -31,5 +31,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     id,
     parsed.data,
   );
+  await recordReportAccess({reportId:id,userId:user.id,action:parsed.data.shared?"share":"revoke",userAgent:request.headers.get("user-agent")??undefined});
   return NextResponse.json({ ok: true });
 }

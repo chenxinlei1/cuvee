@@ -3,6 +3,8 @@ import { z } from "zod";
 import { authenticate, createSession, emailVerificationState, loginRetryAfter, recordLoginResult, userStatusByEmail, writeAuditLog } from "@/lib/auth/db";
 import { BROWSER_SESSION_AGE, REMEMBERED_SESSION_AGE, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth/session";
 import { clientIp, isSameOrigin } from "@/lib/auth/request-security";
+import { increment } from "@/lib/observability/metrics";
+import { log } from "@/lib/observability/logger";
 export const runtime = "nodejs";
 const Body = z.object({ email: z.string().email(), password: z.string().min(8).max(128), remember: z.boolean().optional().default(true) });
 export async function POST(request: Request) {
@@ -17,6 +19,7 @@ export async function POST(request: Request) {
     );
   const user = await authenticate(parsed.data.email, parsed.data.password);
   if (!user) {
+    increment("cuvee_login_failures_total","Failed login attempts");log("warn","auth.login_failed",{email:parsed.data.email.toLowerCase(),ip:clientIp(request)});
     await recordLoginResult(parsed.data.email, false);
     await writeAuditLog(null, "auth.login_failed", "user", undefined, { email: parsed.data.email });
     const status=await userStatusByEmail(parsed.data.email);
@@ -29,6 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Verify your email before signing in" }, { status: 403 });
   }
   await recordLoginResult(parsed.data.email, true);
+  increment("cuvee_logins_total","Successful logins");log("info","auth.login",{userId:user.id,organizationId:user.organizationId});
   await writeAuditLog(user.id, "auth.login", "user", user.id);
   const maxAge = parsed.data.remember ? REMEMBERED_SESSION_AGE : BROWSER_SESSION_AGE;
   const token = await createSession(user.id, { maxAgeSeconds: maxAge, userAgent: request.headers.get("user-agent") ?? undefined, ipAddress: clientIp(request) });

@@ -1,10 +1,14 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const config: NextConfig = {
+  // Allows isolated builds when another local Next.js process is running.
+  distDir: process.env.CUVEE_NEXT_DIST_DIR || ".next",
+  output: "standalone",
   reactStrictMode: true,
   // Do not let lockfiles in parent directories make Next scan the user's
   // entire home directory. Besides incorrect routing, that can exhaust the
@@ -40,4 +44,8 @@ const config: NextConfig = {
   },
 };
 
-export default config;
+export default withSentryConfig(config, {
+  silent: true,
+  webpack: { treeshake: { removeDebugLogging: true } },
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+});

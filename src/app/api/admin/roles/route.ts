@@ -1,0 +1,10 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { currentUser } from "@/lib/auth/session";
+import { hasPermission } from "@/lib/auth/types";
+import { listAccessRoles, listPermissionDefinitions, setAccessRolePermissions, writeAuditLog } from "@/lib/auth/db";
+import { isSameOrigin } from "@/lib/auth/request-security";
+
+const Body=z.object({role:z.enum(["platformAdmin","wineryAdmin","wineryStaff","buyerAdmin","buyerStaff"]),permissions:z.array(z.enum(["analysis:run","workspace:vineyard","workspace:trade","report:read","report:read:any","report:manage","document:manage","document:read:any","user:manage","user:manage:organization","role:manage"])).max(20)});
+export async function GET(){const user=await currentUser();if(!user)return NextResponse.json({error:"Unauthorized"},{status:401});if(!hasPermission(user,"role:manage"))return NextResponse.json({error:"Forbidden"},{status:403});return NextResponse.json({roles:await listAccessRoles(),permissions:await listPermissionDefinitions()});}
+export async function PUT(request:Request){if(!isSameOrigin(request))return NextResponse.json({error:"Invalid request origin"},{status:403});const user=await currentUser();if(!user)return NextResponse.json({error:"Unauthorized"},{status:401});if(!hasPermission(user,"role:manage"))return NextResponse.json({error:"Forbidden"},{status:403});const parsed=Body.safeParse(await request.json().catch(()=>null));if(!parsed.success)return NextResponse.json({error:"Invalid permissions"},{status:400});try{if(!await setAccessRolePermissions(parsed.data.role,parsed.data.permissions))return NextResponse.json({error:"Role not found"},{status:404});await writeAuditLog(user.id,"role.permissions_updated","role",parsed.data.role,{permissions:parsed.data.permissions});return NextResponse.json({ok:true});}catch(error){return NextResponse.json({error:error instanceof Error&&error.message==="PLATFORM_ADMIN_PROTECTED"?"Platform admin must retain role and user management":"Update failed"},{status:400});}}

@@ -1,8 +1,8 @@
 import "server-only";
 import { mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
 import { env } from "@/lib/env";
+import { dataDir } from "@/lib/data-path";
 import type {
   AnalysisRecord,
   CalibrationDrift,
@@ -16,9 +16,9 @@ async function getDatabase(): Promise<import("node:sqlite").DatabaseSync | null>
   if (database !== undefined) return database;
   try {
     const { DatabaseSync } = await import("node:sqlite");
-    const cacheDir = join(process.cwd(), "data", ".memory");
+    const cacheDir = dataDir(".memory");
     mkdirSync(cacheDir, { recursive: true });
-    database = new DatabaseSync(join(cacheDir, "analysis-history.sqlite"));
+    database = new DatabaseSync(dataDir(".memory", "analysis-history.sqlite"));
     database.exec(`
       CREATE TABLE IF NOT EXISTS analysis_history (
         id TEXT PRIMARY KEY,

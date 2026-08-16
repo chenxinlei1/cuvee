@@ -1,0 +1,5 @@
+import "server-only";
+import { createHmac, timingSafeEqual } from "node:crypto";
+function secret(){const value=process.env.CUVEE_DOWNLOAD_SECRET??process.env.CUVEE_AUTH_SECRET;if(!value)throw new Error("CUVEE_DOWNLOAD_SECRET is required");return value;}
+export function createDownloadToken(reportId:string,userId:string,ttlSeconds=300){const payload=Buffer.from(JSON.stringify({reportId,userId,exp:Date.now()+ttlSeconds*1000})).toString("base64url");const signature=createHmac("sha256",secret()).update(payload).digest("base64url");return `${payload}.${signature}`;}
+export function verifyDownloadToken(token:string){const[payload,signature]=token.split(".");if(!payload||!signature)return null;const expected=Buffer.from(createHmac("sha256",secret()).update(payload).digest("base64url")),actual=Buffer.from(signature);if(expected.length!==actual.length||!timingSafeEqual(expected,actual))return null;try{const value=JSON.parse(Buffer.from(payload,"base64url").toString()) as{reportId?:string;userId?:string;exp?:number};return value.reportId&&value.userId&&value.exp&&value.exp>Date.now()?{reportId:value.reportId,userId:value.userId}:null;}catch{return null;}}

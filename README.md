@@ -97,16 +97,22 @@ connection string and the TLS settings required by the provider.
 | `CUVEE_MEMORY_DISABLED` | Set `true` to disable the SQLite memory layer entirely (no episodic recall, no few-shot injection) | `false` |
 | `CUVEE_MEMORY_MAX_ROWS` | Row cap; oldest rows are FIFO-evicted past this | `1000` |
 | `CUVEE_MEMORY_FEW_SHOT_LIMIT` | Number of past predictions injected into the extraction prompt as calibration anchors | `3` |
+| `CUVEE_DATA_DIR` | Runtime data root — SQLite state, bundled datasets, pre-hydrated cache export. The Docker image mounts a persistent volume here. | `data/` |
+| `CUVEE_WORKER_ENABLED` | Run the in-process analysis worker. Set `false` to offload execution to a dedicated worker. | `true` |
+| `CUVEE_WORKER_CONCURRENCY` | Max parallel analyses executed by the worker | `2` |
+| `CUVEE_WORKER_POLL_MS` / `CUVEE_WORKER_STALE_MS` | Queue poll interval / heartbeat staleness for crash re-claim | `1500` / `60000` |
+| `CUVEE_TASK_TTL_MS` | Finished/pending tasks are deleted after this TTL | `24h` |
 
 > `.env.local` is git-ignored. **Never commit real keys.** This repo is public.
 
 #### Authentication and RBAC
 
-Set `CUVEE_AUTH_SECRET` to a long random value before deployment. Production refuses to create
-sessions when it is missing. Cuvée uses a signed, HttpOnly, Secure session cookie and a
-PostgreSQL user/audit database. The server enforces five
-roles: `platformAdmin`, `wineryAdmin`, `wineryStaff`, `buyerAdmin`, and `buyerStaff`; hiding a button in the browser is never treated as
-authorization.
+Cuvée uses revocable, database-backed HttpOnly/Secure sessions and PostgreSQL for users, roles,
+permissions, organizations, reports, documents, and audit logs. Five system roles are seeded:
+`platformAdmin`, `wineryAdmin`, `wineryStaff`, `buyerAdmin`, and `buyerStaff`. Their permission
+assignments live in PostgreSQL and can be changed from the Platform Admin console. Every request
+reloads effective permissions, so changes apply to existing sessions immediately; hiding a
+browser control is never treated as authorization.
 
 Local demo accounts are seeded automatically in development. Production only seeds them when
 `CUVEE_SEED_DEMO_USERS=true`; never enable that flag for a public deployment.
@@ -119,10 +125,10 @@ Local demo accounts are seeded automatically in development. Production only see
 | 商超 / 酒商管理员 | `buyer-admin@cuvee.demo` | `cuvee-buyer-admin-2024` |
 | 采购员 | `buyer-staff@cuvee.demo` | `cuvee-buyer-staff-2024` |
 
-Platform Admin can open `/admin`; Platform Admin, Winery Admin, and Winery Staff can run `/api/analyze`; Buyer Admin and Buyer Staff receive `403`
-for analysis but can read reports explicitly shared through `report_permissions`. Report owners
-and Platform Admin can grant or revoke access from the report-history card. Replace the demo
-accounts before production.
+Platform Admin can open `/admin` and configure the role-permission matrix. Winery roles receive
+the Vineyard workspace permission; buyer/trade roles receive the Trade workspace permission.
+Both sides can run analysis in their own workspace. Report owners, organization report managers,
+and Platform Admin can grant or revoke access. Replace the demo accounts before production.
 
 New users can submit `/register` with an industry organization type (`chateau`, `negociant`,
 `distributor`, or `buyer`). Self-registration always creates a `pending` Buyer Staff account;
@@ -130,16 +136,50 @@ it cannot sign in until a Platform Admin approves it and assigns the final role.
 an active user directly, change roles, disable/enable accounts, and cannot alter their own role
 or status accidentally.
 
-Reports carry an explicit visibility level: `private` (owner + Platform Admin only), `restricted`
-(explicit user/organization grants), or `workspace` (authenticated workspace visibility). A grant
+Reports and documents carry a required `organization_id`. Reports have an explicit visibility level: `private` (owner + Platform Admin only), `restricted`
+(explicit user/organization grants), or `workspace` (members of the same organization only). A grant
 may target an active user or an organization, expire at a fixed time, and independently allow
 or deny Word download. Workspace visibility does not imply download permission; legacy shares are
 migrated as view-only.
 
-Organization classification chooses the default workspace after approval; it never grants
-capabilities. Winery users land in Vineyard, Buyer users land in Trade, and Platform Admins land in the AOS management console. Château registration uses the bundled classed-growth list
-instead of free text. Organization grants target the exact `type + organization name` pair, so a
+Workspace access is an explicit database permission rather than a client-side role check. Winery users normally land in Vineyard, Buyer users in Trade, and Platform Admins in the AOS management console. Château registration uses the bundled classed-growth list
+instead of free text. Organization grants target an immutable organization UUID, so a
 report shared with one buyer group is not exposed to every buyer organization.
+
+Run `pnpm test:rbac` after RBAC or data-query changes to verify cross-organization isolation.
+
+#### Production operations
+
+Run the complete stack with `docker compose up -d --build`. The application runs as a non-root
+user, waits for PostgreSQL health, and exposes `/api/health`. The backup service creates a verified
+custom-format PostgreSQL dump every 24 hours in `backups/`, retains 14 days by default, and writes
+a SHA-256 checksum. Override `BACKUP_INTERVAL_SECONDS` and `BACKUP_RETENTION_DAYS` as needed; copy
+this directory to encrypted off-site storage in production.
+
+Create an immediate backup with `pnpm db:backup`. Restore into a prepared database with:
+
+```bash
+DATABASE_URL=postgresql://... pnpm db:restore -- backups/cuvee-TIMESTAMP.dump
+```
+
+The restore script verifies the SHA-256 checksum when present, then restores
+directly through `DATABASE_URL` (managed databases), through libpq environment
+variables, or falls back to `docker compose exec` for the local stack.
+`BACKUP_DIR` / `BACKUP_HOST_DIR` override the container and host backup paths.
+
+`/api/metrics` returns Prometheus text metrics. Set `CUVEE_METRICS_TOKEN` to require a Bearer token.
+Configure `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` to enable server and browser error reporting;
+without them, Sentry remains disabled. Logs are emitted as structured JSON with passwords, tokens,
+cookies, and API keys redacted before writing; process gauges (uptime, heap, RSS) are exported
+alongside the application counters. CI uploads source maps when `SENTRY_AUTH_TOKEN` is configured.
+
+Restricted report grants can expire and independently allow download. Downloads are re-authorized
+at request time, use a five-minute signed URL, and are recorded in `report_access_logs`. Report
+managers can query `/api/reports/:id/access-log`.
+
+GitHub Actions runs PostgreSQL migrations, disposable test fixtures, unit/security/RBAC/report
+tests, a backup → restore round-trip against a disposable PostgreSQL, lint, type checks,
+production build, and Docker image build.
 
 Authentication limits each email address to five failed sign-in attempts per 15-minute window.
 Users can change their password from `/account/security`; a successful change clears the current
@@ -176,6 +216,15 @@ pnpm dev
 
 Pick a château on the map (or a region in the sidebar), click **Run analysis**, watch the workflow hero animate through the agents. The result drawer reveals on click-through. Typical cold call: ~40-55 s; the orchestrator caches results in memory for 30 min, so the **second** run of the same query returns in <50 ms.
 
+Analysis is submitted as an **async task**: `POST /api/analyze` returns a
+`taskId` in milliseconds, an in-process worker (PostgreSQL-backed, `SKIP
+LOCKED` claim + heartbeat crash recovery) executes the pipeline off the HTTP
+request, and the client polls `GET /api/analyze/:taskId` until completion. A
+configurable concurrency cap (`CUVEE_WORKER_CONCURRENCY`, default 2) protects
+the LLM budget; disable the in-process worker with
+`CUVEE_WORKER_ENABLED=false` when offloading execution to a dedicated worker
+service.
+
 ### Useful scripts
 
 | Command | Purpose |
@@ -185,6 +234,12 @@ Pick a château on the map (or a region in the sidebar), click **Run analysis**,
 | `pnpm typecheck` | `tsc --noEmit` strict type check |
 | `pnpm lint` | ESLint |
 | `pnpm format` | Prettier write |
+| `pnpm test:unit` | Unit checks — permissions, download tokens, logger redaction, metrics, dataset + i18n integrity (no DB) |
+| `pnpm test:security` | HMAC download-token checks |
+| `pnpm test:rbac` | Cross-organization report isolation |
+| `pnpm test:report-auth` | Report grants, expiry, revocation, download flag |
+| `pnpm test:tasks` | Async task lifecycle — insert, claim, heartbeat, complete/fail, re-claim, cleanup |
+| `pnpm test:backup` | Backup → restore round-trip against a reachable PostgreSQL |
 | `pnpm check:env` | Provider key ping |
 | `pnpm test:geo` | Smoke-test `geo_agent` directly |
 | `pnpm test:weather` | Smoke-test `weather_agent` directly |
@@ -236,6 +291,13 @@ POST /api/analyze
         │
         ▼
    ┌──────────────────────────────────────────────────────────────┐
+   │ Task queue (PostgreSQL)                                      │
+   │   POST → analysis_tasks row (pending) → { taskId }           │
+   │   worker claims with FOR UPDATE SKIP LOCKED, heartbeat +     │
+   │   stale re-claim for crash recovery, TTL cleanup             │
+   └───────────────────────────────┬──────────────────────────────┘
+                                   ▼
+   ┌──────────────────────────────────────────────────────────────┐
    │ Orchestrator — directDispatch (default)                      │
    │   phase 1 (parallel)  weather + geo + tavily_agent           │
    │                       (tavily_agent uses defaultRetrieval()) │
@@ -245,6 +307,10 @@ POST /api/analyze
    │   phase 3 (parallel)  feature + backtest (if past year)      │
    │   then                memory().insert(record)                │
    └──────────────────────────────────────────────────────────────┘
+        │
+        ▼
+   status → running/extracting/writing → completed + result
+   client polls GET /api/analyze/:taskId
         │
         ▼
    AnalyzeResult { riskScore, qualityBand, drivers, recommendations,

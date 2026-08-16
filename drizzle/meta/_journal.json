@@ -15,6 +15,27 @@
       "when": 1786890000000,
       "tag": "0001_account_security",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786895000000,
+      "tag": "0002_dynamic_rbac_organizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786900000000,
+      "tag": "0003_report_access_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787000000000,
+      "tag": "0004_analysis_tasks",
+      "breakpoints": true
     }
   ]
 }

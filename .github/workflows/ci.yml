@@ -1,0 +1,108 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: cuvee
+          POSTGRES_USER: cuvee
+          POSTGRES_PASSWORD: cuvee-ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cuvee -d cuvee"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://cuvee:cuvee-ci@127.0.0.1:5432/cuvee
+      CUVEE_AUTH_SECRET: ci-auth-secret-at-least-32-characters
+      CUVEE_DOWNLOAD_SECRET: ci-download-secret-at-least-32-characters
+      CUVEE_SEED_DEMO_USERS: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: node --import tsx --require ./scripts/_server-only-shim.cjs scripts/seed-test-fixtures.ts
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: docker build -t cuvee:${{ github.sha }} .
+
+  backup-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: cuvee
+          POSTGRES_USER: cuvee
+          POSTGRES_PASSWORD: cuvee-ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cuvee -d cuvee"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backup/restore round-trip
+        run: |
+          docker run --rm --network host \
+            -v "${{ github.workspace }}:/work" -w /work \
+            -e PGHOST=127.0.0.1 -e PGPORT=5432 -e PGDATABASE=cuvee \
+            -e PGUSER=cuvee -e PGPASSWORD=cuvee-ci \
+            postgres:17-alpine /bin/sh scripts/test-backup-restore.sh
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: cuvee
+          POSTGRES_USER: cuvee
+          POSTGRES_PASSWORD: cuvee-ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cuvee -d cuvee"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgresql://cuvee:cuvee-ci@127.0.0.1:5432/cuvee
+      - run: docker build -t cuvee:ci .
+      - name: Run image and probe health + metrics
+        run: |
+          docker run -d --name cuvee-smoke --network host \
+            -e DATABASE_URL=postgresql://cuvee:cuvee-ci@127.0.0.1:5432/cuvee \
+            -e CUVEE_AUTH_SECRET=ci-auth-secret-at-least-32-characters \
+            -e CUVEE_DOWNLOAD_SECRET=ci-download-secret-at-least-32-characters \
+            cuvee:ci
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:3000/api/health
+          curl -fsS http://127.0.0.1:3000/api/metrics | grep -q "cuvee_database_up 1"
+          curl -fsS http://127.0.0.1:3000/api/metrics | grep -q "cuvee_process_uptime_seconds"

@@ -1,6 +1,6 @@
 import "server-only";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dataDir } from "@/lib/data-path";
 import type { AnalyzeResult } from "@/lib/wine/types";
 
 const TTL_MS = 24 * 60 * 60_000;
@@ -9,9 +9,9 @@ let database: import("node:sqlite").DatabaseSync | null = null;
 async function db(): Promise<import("node:sqlite").DatabaseSync> {
   if (database) return database;
   const { DatabaseSync } = await import("node:sqlite");
-  const dir = join(process.cwd(), "data", ".memory");
+  const dir = dataDir(".memory");
   mkdirSync(dir, { recursive: true });
-  database = new DatabaseSync(join(dir, "analysis-result-cache.sqlite"));
+  database = new DatabaseSync(dataDir(".memory", "analysis-result-cache.sqlite"));
   database.exec(`
     CREATE TABLE IF NOT EXISTS analysis_result_cache (
       cache_key TEXT PRIMARY KEY,

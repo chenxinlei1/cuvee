@@ -14,7 +14,8 @@ export function AuthNav() {
 
   async function refresh() {
     const response = await fetch("/api/auth/me", { cache: "no-store" });
-    setUser(response.ok ? ((await response.json()) as { user: AuthUser }).user : null);
+    const value=response.ok ? ((await response.json()) as { user: AuthUser }).user : null;
+    setUser(value ? { ...value, permissions: Array.isArray(value.permissions) ? value.permissions : [] } : null);
   }
   useEffect(() => {
     void refresh();

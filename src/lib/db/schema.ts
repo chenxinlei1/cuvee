@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  check,
   index,
   jsonb,
   pgEnum,
@@ -10,6 +11,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const roleEnum = pgEnum("role", [
   "platformAdmin",
@@ -28,6 +30,29 @@ export const organizationTypeEnum = pgEnum("organization_type", [
 export const visibilityEnum = pgEnum("report_visibility", ["private", "restricted", "workspace"]);
 export const grantTargetEnum = pgEnum("grant_target_kind", ["user", "organization"]);
 
+export const organizations = pgTable("organizations", {
+  id: uuid("id").primaryKey(),
+  name: text("name").notNull(),
+  type: organizationTypeEnum("type").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => [unique().on(table.type, table.name)]);
+
+export const accessRoles = pgTable("access_roles", {
+  id: uuid("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  system: boolean("system").notNull().default(false),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export const permissions = pgTable("permissions", {
+  key: text("key").primaryKey(),
+  description: text("description").notNull(),
+});
+export const rolePermissions = pgTable("role_permissions", {
+  roleId: uuid("role_id").notNull().references(() => accessRoles.id, { onDelete: "cascade" }),
+  permissionKey: text("permission_key").notNull().references(() => permissions.key, { onDelete: "cascade" }),
+}, (table) => [primaryKey({ columns: [table.roleId, table.permissionKey] })]);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey(),
   email: text("email").notNull().unique(),
@@ -40,6 +65,17 @@ export const users = pgTable("users", {
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   emailVerifiedAt: bigint("email_verified_at", { mode: "number" }),
 });
+export const organizationMembers = pgTable("organization_members", {
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => [primaryKey({ columns: [table.organizationId, table.userId] }), unique().on(table.userId)]);
+export const userRoles = pgTable("user_roles", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  roleId: uuid("role_id").notNull().references(() => accessRoles.id, { onDelete: "cascade" }),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => [primaryKey({ columns: [table.userId, table.roleId] })]);
 
 export const authTokenTypeEnum = pgEnum("auth_token_type", ["email_verification", "password_reset"]);
 export const authTokens = pgTable(
@@ -78,6 +114,7 @@ export const reports = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id),
+    organizationId: uuid("organization_id").references(() => organizations.id),
     regionId: text("region_id").notNull(),
     regionName: text("region_name").notNull(),
     vintage: text("vintage").notNull(),
@@ -101,6 +138,7 @@ export const documents = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id),
+    organizationId: uuid("organization_id").references(() => organizations.id),
     filename: text("filename").notNull(),
     size: bigint("size", { mode: "number" }).notNull(),
     mime: text("mime").notNull(),
@@ -173,5 +211,44 @@ export const reportGrants = pgTable(
   (table) => [
     unique().on(table.reportId, table.targetKind, table.targetValue),
     index("idx_report_grants_report").on(table.reportId),
+  ],
+);
+export const reportAccessLogs = pgTable("report_access_logs", {
+  id: uuid("id").primaryKey(),
+  reportId: uuid("report_id").notNull().references(() => reports.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => [index("idx_report_access_report_time").on(table.reportId, table.createdAt)]);
+export const analysisTasks = pgTable(
+  "analysis_tasks",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
+    input: jsonb("input").notNull(),
+    status: text("status").notNull().default("pending"),
+    stage: text("stage"),
+    progress: bigint("progress", { mode: "number" }).notNull().default(0),
+    result: jsonb("result"),
+    error: text("error"),
+    heartbeat: bigint("heartbeat", { mode: "number" }),
+    createdAt: bigint("created_at", { mode: "number" }).notNull(),
+    startedAt: bigint("started_at", { mode: "number" }),
+    finishedAt: bigint("finished_at", { mode: "number" }),
+  },
+  (table) => [
+    check(
+      "analysis_tasks_status_check",
+      sql`${table.status} IN ('pending','running','completed','failed')`,
+    ),
+    index("idx_analysis_tasks_claim").on(table.status, table.createdAt),
+    index("idx_analysis_tasks_owner_time").on(table.ownerId, table.createdAt),
   ],
 );

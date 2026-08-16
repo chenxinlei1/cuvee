@@ -1,6 +1,6 @@
 import "server-only";
 import { readFileSync } from "node:fs";
-import path from "node:path";
+import { dataDir } from "@/lib/data-path";
 
 /**
  * Climate data loader — historical vintage features (1990-2024) +
@@ -110,7 +110,7 @@ export function loadHistorical(): ClimateRow[] {
   if (_historical !== null) return _historical;
   try {
     const text = readFileSync(
-      path.join(process.cwd(), "data/climate_features_downscaled.csv"),
+      dataDir("climate_features_downscaled.csv"),
       "utf-8",
     );
     _historical = parseCsv(text).map(parseClimateRow);
@@ -125,7 +125,7 @@ export function loadForecast(): ForecastRow[] {
   if (_forecast !== null) return _forecast;
   try {
     const text = readFileSync(
-      path.join(process.cwd(), "data/climate_features_forecast_2026.csv"),
+      dataDir("climate_features_forecast_2026.csv"),
       "utf-8",
     );
     _forecast = parseCsv(text).map(parseForecastRow);
@@ -139,7 +139,7 @@ export function loadForecast(): ForecastRow[] {
 export function loadMonthly(): MonthlyRow[] {
   if (_monthly !== null) return _monthly;
   try {
-    const text = readFileSync(path.join(process.cwd(), "data/climate_monthly.csv"), "utf-8");
+    const text = readFileSync(dataDir("climate_monthly.csv"), "utf-8");
     _monthly = parseCsv(text).map(parseMonthlyRow);
   } catch (err) {
     console.warn("[climate] failed to load monthly:", err);
@@ -179,7 +179,7 @@ export function getMonthlyRows(opts: {
 export function loadSkill(): ForecastSkill | null {
   if (_skill !== null) return _skill;
   try {
-    const text = readFileSync(path.join(process.cwd(), "data/forecast_skill.json"), "utf-8");
+    const text = readFileSync(dataDir("forecast_skill.json"), "utf-8");
     const raw = JSON.parse(text);
     // Structure: centre → system → variable → lead_N → {...}
     const node = raw?.ecmwf?.["51"];

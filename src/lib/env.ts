@@ -64,6 +64,22 @@ const serverSchema = z.object({
   CUVEE_MEMORY_MAX_ROWS: z.coerce.number().int().positive().default(1000),
   /** Number of past examples to inject as few-shot calibration anchors. */
   CUVEE_MEMORY_FEW_SHOT_LIMIT: z.coerce.number().int().min(0).max(8).default(3),
+
+  // ─── async task worker (analysis queue) ──────────────────────────────
+  /** Set "false" to disable the in-process worker entirely (serverless /
+   *  ephemeral runtimes must offload execution to a long-running worker). */
+  CUVEE_WORKER_ENABLED: z
+    .union([z.literal("true"), z.literal("false"), z.literal("")])
+    .optional()
+    .transform((v) => v !== "false"),
+  /** Maximum number of analyses executed concurrently by the worker. */
+  CUVEE_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
+  /** How often the worker polls the task table (ms). */
+  CUVEE_WORKER_POLL_MS: z.coerce.number().int().min(200).max(60_000).default(1500),
+  /** Heartbeat age after which a running task is considered crashed and re-claimed (ms). */
+  CUVEE_WORKER_STALE_MS: z.coerce.number().int().min(5_000).max(3_600_000).default(60_000),
+  /** Finished/pending tasks are deleted after this TTL (ms). */
+  CUVEE_TASK_TTL_MS: z.coerce.number().int().min(60_000).default(24 * 60 * 60_000),
 });
 
 const publicSchema = z.object({

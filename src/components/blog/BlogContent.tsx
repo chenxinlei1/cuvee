@@ -24,6 +24,7 @@ interface PageCopy {
   howIntro: string;
   howSteps: string[];
   vineyardCaption: string;
+  tradeCaption: string;
   reportsCaption: string;
   stages: Stage[];
   faq: QA[];
@@ -48,15 +49,18 @@ const COPY: Record<Locale, PageCopy> = {
     architecture: "Architecture",
     qa: "Q&A",
     howTitle: "Start using Cuvée",
-    howIntro: "From sign-in to a shareable vintage report in four steps.",
+    howIntro: "From sign-in to a shareable vintage report in five steps.",
     howSteps: [
       "Sign in with your organization account. Your role determines which workspace you can access.",
       "Choose a region, vintage and optional château. Vineyard users may also select internal TXT/CSV evidence.",
+      "In Trade, search or filter the 1855 château atlas, select an estate, then run market and allocation analysis for the buyer persona.",
       "Run the analysis and follow the agent workflow as climate, terroir, retrieval and scoring complete.",
       "Open Reports to review results, control visibility, grant access and download authorized documents.",
     ],
     vineyardCaption:
       "Vineyard workspace — select a region and timeframe, attach internal evidence, then run the analysis.",
+    tradeCaption:
+      "Trade workspace — explore the classified château atlas, select an estate and evaluate market, pricing and allocation signals.",
     reportsCaption:
       "Reports — revisit saved assessments and manage private, restricted or workspace visibility.",
     stages: [
@@ -148,14 +152,16 @@ const COPY: Record<Locale, PageCopy> = {
     architecture: "系统架构",
     qa: "常见问题",
     howTitle: "如何使用 Cuvée",
-    howIntro: "从登录到生成并分享年份分析报告，只需要四步。",
+    howIntro: "从登录到生成并分享年份分析报告，只需要五步。",
     howSteps: [
       "使用组织账号登录。系统会根据角色和组织类型进入对应的葡萄园或贸易工作区。",
       "选择产区、年份和可选酒庄；葡萄园用户还可以选择内部 TXT/CSV 文档作为分析证据。",
+      "在贸易工作区搜索或筛选 1855 列级庄地图，选择目标酒庄，并按照采购角色分析市场、定价与配额信号。",
       "点击“运行分析”，查看气候、风土、公开检索、评分与报告智能体依次完成工作。",
       "进入“历史报告”，重新查看结果、设置可见范围、指定授权对象并下载获准文档。",
     ],
     vineyardCaption: "葡萄园工作区：选择产区和时间，加入内部证据，然后运行分析。",
+    tradeCaption: "贸易工作区：浏览列级庄地图、选择目标酒庄，并分析市场、定价和采购配额信号。",
     reportsCaption: "报告管理：查看历史分析，并管理私有、指定授权或工作区可见范围。",
     stages: [
       [
@@ -246,15 +252,18 @@ const COPY: Record<Locale, PageCopy> = {
     architecture: "Architecture du système",
     qa: "Questions fréquentes",
     howTitle: "Prendre en main Cuvée",
-    howIntro: "De la connexion au rapport de millésime partageable en quatre étapes.",
+    howIntro: "De la connexion au rapport de millésime partageable en cinq étapes.",
     howSteps: [
       "Connectez-vous avec le compte de votre organisation. Le rôle et le type d’organisation déterminent l’espace accessible.",
       "Choisissez une région, un millésime et éventuellement un château. Le domaine peut aussi sélectionner des preuves TXT/CSV internes.",
+      "Dans l’espace Négoce, recherchez les crus classés de 1855, sélectionnez un domaine et analysez marché, prix et allocation selon le profil acheteur.",
       "Lancez l’analyse et suivez le climat, le terroir, la recherche publique, la notation et la génération du rapport.",
       "Ouvrez Rapports pour consulter les analyses, régler la visibilité, accorder un accès et télécharger les documents autorisés.",
     ],
     vineyardCaption:
       "Espace Domaine — choisissez la région et la période, ajoutez les preuves internes, puis lancez l’analyse.",
+    tradeCaption:
+      "Espace Négoce — explorez l’atlas des crus classés, sélectionnez un domaine et évaluez marché, prix et allocation.",
     reportsCaption:
       "Rapports — retrouvez les analyses et gérez la visibilité privée, restreinte ou de l’espace de travail.",
     stages: [
@@ -371,7 +380,7 @@ export function BlogContent() {
             </li>
           ))}
         </ol>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
           <figure className="card-lg overflow-hidden">
             <Image
               src="/how-to/vineyard-dashboard.png"
@@ -383,6 +392,18 @@ export function BlogContent() {
             />
             <figcaption className="text-soft p-4 text-xs leading-relaxed">
               {copy.vineyardCaption}
+            </figcaption>
+          </figure>
+          <figure className="card-lg overflow-hidden">
+            <Image
+              src="/how-to/trade-dashboard.jpg"
+              width={1274}
+              height={717}
+              alt={copy.tradeCaption}
+              className="border-line h-auto w-full border-b"
+            />
+            <figcaption className="text-soft p-4 text-xs leading-relaxed">
+              {copy.tradeCaption}
             </figcaption>
           </figure>
           <figure className="card-lg overflow-hidden">

@@ -1,4 +1,33 @@
 services:
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://cuvee:cuvee-local@postgres:5432/cuvee
+      CUVEE_AUTH_SECRET: ${CUVEE_AUTH_SECRET:-change-this-local-secret-at-least-32-chars}
+      CUVEE_DOWNLOAD_SECRET: ${CUVEE_DOWNLOAD_SECRET:-change-this-download-secret-at-least-32-chars}
+      CUVEE_SEED_DEMO_USERS: "false"
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      CUVEE_METRICS_TOKEN: ${CUVEE_METRICS_TOKEN:-}
+      CUVEE_DATA_DIR: /app/data
+      CUVEE_WORKER_ENABLED: ${CUVEE_WORKER_ENABLED:-true}
+      CUVEE_WORKER_CONCURRENCY: ${CUVEE_WORKER_CONCURRENCY:-2}
+      CUVEE_WORKER_POLL_MS: ${CUVEE_WORKER_POLL_MS:-1500}
+      CUVEE_WORKER_STALE_MS: ${CUVEE_WORKER_STALE_MS:-60000}
+    ports:
+      - "3000:3000"
+    volumes:
+      - cuvee-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
   postgres:
     image: postgres:17-alpine
     environment:
@@ -14,6 +43,28 @@ services:
       interval: 2s
       timeout: 3s
       retries: 15
+    restart: unless-stopped
+
+  backup:
+    image: postgres:17-alpine
+    environment:
+      PGHOST: postgres
+      PGDATABASE: cuvee
+      PGUSER: cuvee
+      PGPASSWORD: cuvee-local
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_LOOP: "true"
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_DIR: ${BACKUP_DIR:-/backups}
+    volumes:
+      - ${BACKUP_HOST_DIR:-./backups}:${BACKUP_DIR:-/backups}
+      - ./scripts/backup-postgres.sh:/usr/local/bin/backup-postgres:ro
+    entrypoint: ["/bin/sh","/usr/local/bin/backup-postgres"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   cuvee-postgres:
+  cuvee-data:

@@ -1,9 +1,9 @@
 import "server-only";
 import { readFileSync } from "node:fs";
-import path from "node:path";
 import { env, isDemoMode } from "@/lib/env";
 import { defaultLLM, hasLLM } from "@/lib/llm";
 import { memory, formatFewShotExamples } from "@/lib/memory";
+import { dataDir } from "@/lib/data-path";
 import type { AgentContext, SubAgent } from "@/lib/agents/types";
 import type { Persona, Recommendation, RiskDriver, UploadMeta } from "@/lib/wine/types";
 
@@ -293,13 +293,13 @@ export interface ExtractionOutput {
 
 // ─── Schema loading ────────────────────────────────────────────────────
 
-const SCHEMA_PATH = "data/wine-vintage-quality-schema.json";
+const SCHEMA_PATH = "wine-vintage-quality-schema.json";
 
 let _schemaText: string | null = null;
 function loadSchemaText(): string {
   if (_schemaText === null) {
     try {
-      _schemaText = readFileSync(path.join(process.cwd(), SCHEMA_PATH), "utf-8");
+      _schemaText = readFileSync(dataDir(SCHEMA_PATH), "utf-8");
     } catch (err) {
       console.warn(`[extraction] could not load ${SCHEMA_PATH}:`, err);
       _schemaText = "";

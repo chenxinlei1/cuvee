@@ -69,6 +69,7 @@ Before opening a PR:
 
 - [ ] `pnpm typecheck` clean — strict mode, no `any`, `noUncheckedIndexedAccess` on
 - [ ] `pnpm lint` clean
+- [ ] `pnpm test` green — unit, security, RBAC isolation, and report-authorization suites
 - [ ] If you touched a sub-agent, exercise it via the dashboard once and confirm the trace entry shows `ok: true`
 - [ ] If you added a new external API call, add a demo fixture branch in `src/lib/demo/fixtures.ts` so `NEXT_PUBLIC_DEMO_MODE=true` still works offline
 - [ ] If you changed the schema in `data/wine-vintage-quality-schema.json`, re-run the four reference vintages (Lafite 2010, 2013, 2015, 2017) and confirm the bands still match historical critic consensus

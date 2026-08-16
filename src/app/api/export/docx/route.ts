@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/types";
-import { canDownloadReport } from "@/lib/auth/db";
+import { canDownloadReport, recordReportAccess, writeAuditLog } from "@/lib/auth/db";
+import { clientIp } from "@/lib/auth/request-security";
 import {
   AlignmentType,
   BorderStyle,
@@ -196,6 +197,7 @@ export async function POST(request: Request) {
     ],
   });
   const buffer = await Packer.toBuffer(word);
+  if(parsed.data.reportId) await Promise.all([recordReportAccess({reportId:parsed.data.reportId,userId:user.id,action:"download",ipAddress:clientIp(request),userAgent:request.headers.get("user-agent")??undefined}),writeAuditLog(user.id,"report.download","report",parsed.data.reportId)]);
   return new Response(new Uint8Array(buffer), {
     headers: {
       "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

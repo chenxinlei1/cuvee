@@ -3,36 +3,26 @@ export type OrganizationType = "chateau" | "negociant" | "distributor" | "buyer"
 export type ReportVisibility = "private" | "restricted" | "workspace";
 export type Permission =
   | "analysis:run"
+  | "workspace:vineyard"
+  | "workspace:trade"
   | "report:read"
   | "report:read:any"
   | "report:manage"
   | "document:manage"
   | "document:read:any"
-  | "user:manage";
+  | "user:manage"
+  | "user:manage:organization"
+  | "role:manage";
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   role: Role;
+  permissions: Permission[];
+  organizationId?: string;
   organizationType?: OrganizationType;
   organizationName?: string;
 }
-
-const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  platformAdmin: [
-    "analysis:run",
-    "report:read",
-    "report:read:any",
-    "report:manage",
-    "document:manage",
-    "document:read:any",
-    "user:manage",
-  ],
-  wineryAdmin: ["analysis:run", "report:read", "report:manage", "document:manage"],
-  wineryStaff: ["analysis:run", "report:read", "document:manage"],
-  buyerAdmin: ["analysis:run", "report:read"],
-  buyerStaff: ["analysis:run", "report:read"],
-};
 
 export const ROLE_LABELS: Record<Role, string> = {
   platformAdmin: "平台超级管理员",
@@ -43,30 +33,28 @@ export const ROLE_LABELS: Record<Role, string> = {
 };
 
 export function hasPermission(user: AuthUser, permission: Permission): boolean {
-  return ROLE_PERMISSIONS[user.role].includes(permission);
+  // Sessions created before the database-driven RBAC migration may briefly
+  // expose the legacy user shape during a hot reload. Fail closed instead of
+  // crashing the entire navigation; /api/auth/me will refresh the full set.
+  return Array.isArray(user.permissions) && user.permissions.includes(permission);
 }
 
 export function canAccessVineyard(user: AuthUser): boolean {
   return (
-    hasPermission(user, "analysis:run") &&
-    (user.role === "platformAdmin" || user.organizationType === "chateau")
+    hasPermission(user, "analysis:run") && hasPermission(user, "workspace:vineyard")
   );
 }
 
 export function canAccessTrade(user: AuthUser): boolean {
   return (
-    hasPermission(user, "analysis:run") &&
-    (user.role === "platformAdmin" ||
-      user.organizationType === "negociant" ||
-      user.organizationType === "distributor" ||
-      user.organizationType === "buyer")
+    hasPermission(user, "analysis:run") && hasPermission(user, "workspace:trade")
   );
 }
 
-export function canManageReport(user: AuthUser, ownerId: string): boolean {
+export function canManageReport(user: AuthUser, ownerId: string, organizationId?: string): boolean {
   return (
     hasPermission(user, "report:manage") &&
-    (hasPermission(user, "report:read:any") || user.id === ownerId)
+    (hasPermission(user, "report:read:any") || user.id === ownerId || (Boolean(user.organizationId) && user.organizationId === organizationId))
   );
 }
 

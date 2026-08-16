@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { analyze } from "@/lib/agents/orchestrator";
-import { SponsorUnavailableError } from "@/lib/utils";
+import * as Sentry from "@sentry/nextjs";
 import { currentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/types";
 import { writeAuditLog } from "@/lib/auth/db";
+import { increment } from "@/lib/observability/metrics";
+import { log } from "@/lib/observability/logger";
+import { insertAnalysisTask } from "@/lib/tasks/store";
+import { ensureWorkerStarted } from "@/lib/tasks/worker";
 
 export const runtime = "nodejs";
 
@@ -40,6 +43,7 @@ export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!hasPermission(user, "analysis:run")) {
+    increment("cuvee_authorization_denials_total","Authorization denials");
     await writeAuditLog(user.id, "analysis.denied", "analysis");
     return NextResponse.json({ error: "Forbidden: analysis:run permission required" }, { status: 403 });
   }
@@ -48,18 +52,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   try {
-    const result = await analyze(parsed.data, { signal: req.signal, ownerId: user.id });
-    await writeAuditLog(user.id, "analysis.run", "analysis", undefined, {
+    const taskId = await insertAnalysisTask(user, parsed.data);
+    ensureWorkerStarted();
+    increment("cuvee_tasks_submitted_total", "Analysis tasks submitted");
+    log("info", "analysis.submitted", {
+      taskId,
+      userId: user.id,
+      organizationId: user.organizationId,
+      persona: parsed.data.persona,
+    });
+    await writeAuditLog(user.id, "analysis.submitted", "analysis", taskId, {
       region: parsed.data.region.id,
       persona: parsed.data.persona,
       year: parsed.data.timeframe.start.slice(0, 4),
     });
-    return NextResponse.json(result);
+    return NextResponse.json({ taskId }, { status: 202 });
   } catch (err) {
-    if (err instanceof SponsorUnavailableError) {
-      return NextResponse.json({ error: err.message, sponsor: err.sponsor }, { status: 503 });
-    }
-    console.error("[/api/analyze]", err);
-    return NextResponse.json({ error: "Analyze call failed" }, { status: 500 });
+    increment("cuvee_tasks_submit_errors_total", "Analysis task submission failures");
+    log("error", "analysis.submit_failed", {
+      userId: user.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
+      extra: {
+        region: parsed.data.region.id,
+        persona: parsed.data.persona,
+        year: parsed.data.timeframe.start.slice(0, 4),
+        userId: user.id,
+      },
+    });
+    return NextResponse.json({ error: "Failed to queue analysis" }, { status: 500 });
   }
 }
