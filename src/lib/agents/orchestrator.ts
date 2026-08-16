@@ -167,9 +167,7 @@ export async function analyze(
 
   const today = new Date().toISOString().slice(0, 10);
   const isBacktest = input.timeframe.end < today;
-  const vintageYear = isBacktest
-    ? Number.parseInt(input.timeframe.end.slice(0, 4), 10)
-    : undefined;
+  const vintageYear = isBacktest ? Number.parseInt(input.timeframe.end.slice(0, 4), 10) : undefined;
 
   const ctx: AgentContext = {
     ownerId,
@@ -302,7 +300,11 @@ export async function analyze(
  * SQLite write never blocks the response. Best-effort — memory failures
  * never crash the orchestrator.
  */
-async function persistToMemory(input: AnalyzeInput, result: AnalyzeResult, ownerId: string): Promise<void> {
+async function persistToMemory(
+  input: AnalyzeInput,
+  result: AnalyzeResult,
+  ownerId: string,
+): Promise<void> {
   try {
     const year = Number.parseInt(input.timeframe.end.slice(0, 4), 10);
     if (!Number.isFinite(year)) return;
@@ -322,8 +324,7 @@ async function persistToMemory(input: AnalyzeInput, result: AnalyzeResult, owner
         (c): c is typeof c & { score: number } => typeof c.score === "number",
       );
       if (scored.length > 0) {
-        actualAvgCriticScore =
-          scored.reduce((sum, c) => sum + c.score, 0) / scored.length;
+        actualAvgCriticScore = scored.reduce((sum, c) => sum + c.score, 0) / scored.length;
         actualCriticCount = scored.length;
       }
     }
@@ -379,8 +380,7 @@ async function directDispatch(
     chateau: input.chateau,
   };
   const vintageYear =
-    Number.parseInt(input.timeframe.end.slice(0, 4), 10) ||
-    new Date().getFullYear();
+    Number.parseInt(input.timeframe.end.slice(0, 4), 10) || new Date().getFullYear();
   const tavilyInput = {
     region: "Bordeaux",
     regionId: input.region.id,
@@ -529,6 +529,9 @@ function harvest(input: AnalyzeInput, trace: AgentResult[]): AnalyzeResult {
     region: input.region,
     timeframe: input.timeframe,
     persona: input.persona,
+    // Persist the prose language with the report so a later UI language
+    // switch does not imply that an already-generated report was translated.
+    locale: input.locale ?? "en",
     riskScore: score,
     riskBand: bandOf(score),
     drivers: (extractionData?.drivers as RiskDriver[]) ?? [],

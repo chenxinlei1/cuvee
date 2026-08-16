@@ -4,15 +4,16 @@
   "private": true,
   "description": "Schema-grounded multi-agent vintage intelligence for Burgundy + Bordeaux with critic-backed backtest verification.",
   "license": "MIT",
+  "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=20",
     "pnpm": ">=10"
   },
   "scripts": {
-    "dev": "next dev --turbo",
+    "dev": "NODE_OPTIONS=--no-warnings WATCHPACK_POLLING=true next dev --turbo",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

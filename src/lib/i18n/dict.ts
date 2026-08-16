@@ -35,6 +35,10 @@ export const DICT = {
     fr: "Tous les agents ont terminé. Cliquez pour afficher les résultats détaillés.",
     en: "All agents completed. Click to reveal the detailed results below.",
   },
+  "common.report_language_notice": {
+    fr: "Ce rapport a été généré en {language}. Relancez l’analyse pour le générer dans la langue actuelle.",
+    en: "This report was generated in {language}. Run the analysis again to generate it in the current language.",
+  },
   "common.export_report": { fr: "Exporter le rapport", en: "Export report" },
   "common.subscribe": { fr: "S'abonner", en: "Subscribe" },
   "common.cancel": { fr: "Annuler", en: "Cancel" },
@@ -59,6 +63,59 @@ export const DICT = {
   "nav.sign_in": { fr: "Connexion", en: "Sign in" },
   "theme.light": { fr: "Clair", en: "Light" },
   "theme.dark": { fr: "Sombre", en: "Dark" },
+
+  // ── authentication ────────────────────────────────────────────────────
+  "auth.login.eyebrow": {
+    fr: "Intelligence millésime d'entreprise",
+    en: "Enterprise vintage intelligence",
+  },
+  "auth.login.hero_title": {
+    fr: "Des décisions fondées sur chaque signal.",
+    en: "Decisions grounded in every signal.",
+  },
+  "auth.login.hero_description": {
+    fr: "Réunissez climat, terroir, données web et documents privés dans un flux multi-agent traçable.",
+    en: "Combine climate, terroir, public-web evidence, and private vineyard documents in one traceable multi-agent workflow.",
+  },
+  "auth.login.metric_agents": { fr: "Agents spécialistes", en: "Specialist agents" },
+  "auth.login.metric_rag": { fr: "Sources de preuves RAG", en: "RAG evidence paths" },
+  "auth.login.metric_traceable": { fr: "Analyses traçables", en: "Traceable runs" },
+  "auth.login.secure_workspace": { fr: "Espace sécurisé", en: "Secure workspace" },
+  "auth.login.welcome": { fr: "Heureux de vous revoir", en: "Welcome back" },
+  "auth.login.description": {
+    fr: "Connectez-vous à l'espace Cuvée de votre organisation.",
+    en: "Sign in to your organization's Cuvée workspace.",
+  },
+  "auth.login.email": { fr: "E-mail professionnel", en: "Work email" },
+  "auth.login.password": { fr: "Mot de passe", en: "Password" },
+  "auth.login.show": { fr: "Afficher", en: "Show" },
+  "auth.login.hide": { fr: "Masquer", en: "Hide" },
+  "auth.login.password_placeholder": { fr: "8 caractères minimum", en: "At least 8 characters" },
+  "auth.login.remember": { fr: "Mémoriser cet appareil", en: "Remember this device" },
+  "auth.login.forgot": { fr: "Mot de passe oublié ?", en: "Forgot password?" },
+  "auth.login.submit": { fr: "Se connecter", en: "Sign in" },
+  "auth.login.submitting": { fr: "Connexion…", en: "Signing in…" },
+  "auth.login.request_account": { fr: "Demander un nouveau compte", en: "Request a new account" },
+  "auth.login.demo": { fr: "Compte de démonstration", en: "Interview demo" },
+  "auth.login.fill_demo": { fr: "Remplir les identifiants de démo", en: "Fill demo credentials" },
+  "auth.login.session_note": {
+    fr: "Session serveur sécurisée · Analyste démo : analyst@cuvee.demo / cuvee-demo-2024.",
+    en: "Secure server session · Demo analyst: analyst@cuvee.demo / cuvee-demo-2024.",
+  },
+  "auth.login.return_home": { fr: "Retour à l'accueil", en: "Return home" },
+  "auth.error.invalid_email": {
+    fr: "Saisissez une adresse e-mail professionnelle valide.",
+    en: "Enter a valid work email address.",
+  },
+  "auth.error.short_password": {
+    fr: "Le mot de passe doit contenir au moins 8 caractères.",
+    en: "Password must contain at least 8 characters.",
+  },
+  "auth.error.sign_in_failed": { fr: "Échec de la connexion.", en: "Sign in failed." },
+  "auth.error.unreachable": {
+    fr: "Impossible de joindre le service d'authentification.",
+    en: "Unable to reach the authentication service.",
+  },
 
   // ── atlas + history ─────────────────────────────────────────────────
   "atlas.title": { fr: "Atlas des vins", en: "Wine Atlas" },
@@ -237,9 +294,18 @@ export const DICT = {
   "backtest.predicted_quality": { fr: "Qualité prédite", en: "Predicted quality" },
   "backtest.actual": { fr: "Réel", en: "Actual" },
   "backtest.verdict_kicker": { fr: "Critiques", en: "Critic verdict" },
-  "backtest.verdict.high_agreement": { fr: "Les critiques nous donnent raison", en: "Critics agree with us" },
-  "backtest.verdict.moderate_agreement": { fr: "Concordance partielle des critiques", en: "Critics partly agree" },
-  "backtest.verdict.divergent": { fr: "Les critiques nous contredisent", en: "Critics disagree with us" },
+  "backtest.verdict.high_agreement": {
+    fr: "Les critiques nous donnent raison",
+    en: "Critics agree with us",
+  },
+  "backtest.verdict.moderate_agreement": {
+    fr: "Concordance partielle des critiques",
+    en: "Critics partly agree",
+  },
+  "backtest.verdict.divergent": {
+    fr: "Les critiques nous contredisent",
+    en: "Critics disagree with us",
+  },
   "backtest.our_band": { fr: "Notre note de millésime", en: "Our quality band" },
   "backtest.no_critics": {
     fr: "Aucune donnée critique récupérée — configurez Tavily pour une comparaison réelle.",

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthUser } from "@/lib/auth/types";
+import { hasPermission } from "@/lib/auth/types";
 import { useT } from "@/lib/i18n/Provider";
 
 export function AuthNav() {
@@ -21,17 +22,37 @@ export function AuthNav() {
     return () => window.removeEventListener("cuvee-auth-changed", refresh);
   }, []);
 
-  if (!user) return <Link href="/login" className="chip">{t("nav.sign_in")}</Link>;
+  if (!user)
+    return (
+      <Link href="/login" className="chip">
+        {t("nav.sign_in")}
+      </Link>
+    );
   return (
     <div className="flex items-center gap-2">
-      {user.role === "admin" ? <Link href="/admin" className="chip">Admin</Link> : null}
-      <span className="hidden rounded-pill border border-line px-3 py-2 text-xs md:inline">
-        {user.name} · <span className="uppercase text-soft">{user.organizationType??"unassigned"} / {user.role}</span>
+      {hasPermission(user, "user:manage") ? (
+        <Link href="/admin" className="chip">
+          Admin
+        </Link>
+      ) : null}
+      <span className="border-line hidden rounded-pill border px-3 py-2 text-xs md:inline">
+        {user.name} ·{" "}
+        <span className="text-soft uppercase">
+          {user.organizationType ?? "unassigned"} / {user.role}
+        </span>
       </span>
-      <button className="chip" type="button" onClick={async () => {
-        await fetch("/api/auth/logout", { method: "POST" });
-        setUser(null); router.push("/login"); router.refresh();
-      }}>Sign out</button>
+      <button
+        className="chip"
+        type="button"
+        onClick={async () => {
+          await fetch("/api/auth/logout", { method: "POST" });
+          setUser(null);
+          router.push("/login");
+          router.refresh();
+        }}
+      >
+        Sign out
+      </button>
     </div>
   );
 }

@@ -1,25 +1,322 @@
 "use client";
-import {useEffect,useState} from "react";
-import {useI18n,useT} from "@/lib/i18n/Provider";
-import type {AnalyzeResult} from "@/lib/wine/types";
-import type {AuthUser,OrganizationType,ReportVisibility} from "@/lib/auth/types";
-import {useCurrentUser} from "@/lib/hooks/useCurrentUser";
-const HISTORY_LIMIT=20;
-interface Grant{id:string;targetKind:"user"|"organization";targetValue:string;expiresAt:number|null;canDownload:boolean}
-interface OrganizationTarget{key:string;type:OrganizationType;name:string}
-export interface HistoryEntry{id:string;result:AnalyzeResult;savedAt:string;ownerId?:string;visibility:ReportVisibility;grants:Grant[];canManage:boolean;canDownload:boolean}
-export async function saveReportHistory(result:AnalyzeResult){try{const response=await fetch("/api/reports",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({result})});if(response.ok)window.dispatchEvent(new Event("cuvee-history-updated"));}catch{}}
-export function ReportHistory({onSelect}:{onSelect:(result:AnalyzeResult,access:{reportId:string;canDownload:boolean})=>void}){
- const t=useT();const{locale}=useI18n();const{user}=useCurrentUser();const[entries,setEntries]=useState<HistoryEntry[]>([]);const[viewers,setViewers]=useState<AuthUser[]>([]);const[organizations,setOrganizations]=useState<OrganizationTarget[]>([]);
- async function refresh(){try{const response=await fetch("/api/reports",{cache:"no-store"});setEntries(response.ok?((await response.json())as{reports:HistoryEntry[]}).reports.slice(0,HISTORY_LIMIT):[]);}catch{setEntries([]);}}
- useEffect(()=>{void refresh();const handler=()=>void refresh();window.addEventListener("cuvee-history-updated",handler);window.addEventListener("cuvee-auth-changed",handler);return()=>{window.removeEventListener("cuvee-history-updated",handler);window.removeEventListener("cuvee-auth-changed",handler);};},[]);
- useEffect(()=>{if(!user||user.role==="viewer"){setViewers([]);setOrganizations([]);return;}void fetch("/api/users/share-targets",{cache:"no-store"}).then(async response=>{if(!response.ok)return;const data=(await response.json())as{users:AuthUser[];organizations:OrganizationTarget[]};setViewers(data.users);setOrganizations(data.organizations);});},[user]);
- async function remove(id:string){if((await fetch(`/api/reports/${id}`,{method:"DELETE"})).ok)void refresh();}
- async function setVisibility(id:string,visibility:ReportVisibility){if((await fetch(`/api/reports/${id}/visibility`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({visibility})})).ok)void refresh();}
- async function setGrant(entry:HistoryEntry,input:{targetKind:"user"|"organization";targetValue:string;expiresAt:number|null;canDownload:boolean;shared:boolean}){if((await fetch(`/api/reports/${entry.id}/share`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input)})).ok)void refresh();}
- return <section className="rounded-card border border-line p-4"><div className="flex items-center justify-between"><h3 className="kicker">{t("history.title")}</h3><span className="text-xs text-soft">{entries.length}/{HISTORY_LIMIT}</span></div>{entries.length===0?<p className="mt-3 text-xs text-soft">{t("history.empty")}</p>:<ul className="mt-3 space-y-2">{entries.map(entry=><li key={entry.id} className="rounded-lg border border-line bg-surface-1 p-3"><button onClick={()=>onSelect(entry.result,{reportId:entry.id,canDownload:entry.canDownload})} className="w-full text-left"><span className="flex justify-between gap-3"><span><strong className="block text-sm">{entry.result.region.name}</strong><span className="text-xs text-soft">{entry.result.timeframe.start.slice(0,4)} · {new Date(entry.savedAt).toLocaleString(locale==="zh"?"zh-CN":locale==="fr"?"fr-FR":"en-US")}</span></span><span className="font-mono text-sm">{entry.result.riskScore}/100</span></span></button><div className="mt-2 flex items-center justify-between border-t border-line pt-2"><span className="kicker">{entry.visibility} · {entry.result.qualityBand??entry.result.riskBand}</span>{entry.canManage?<button onClick={()=>void remove(entry.id)} className="text-xs text-soft hover:text-red-400">{t("history.delete")}</button>:null}</div>{entry.canManage?<ShareControls entry={entry} viewers={viewers} organizations={organizations} onVisibility={value=>void setVisibility(entry.id,value)} onGrant={input=>void setGrant(entry,input)}/>:<p className="mt-2 text-[11px] text-soft">{entry.canDownload?"可查看和下载":"仅查看，禁止下载"}</p>}</li>)}</ul>}</section>;
+import { useEffect, useState } from "react";
+import { useI18n, useT } from "@/lib/i18n/Provider";
+import type { AnalyzeResult } from "@/lib/wine/types";
+import type { AuthUser, OrganizationType, ReportVisibility } from "@/lib/auth/types";
+import { hasPermission } from "@/lib/auth/types";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+const HISTORY_LIMIT = 20;
+interface Grant {
+  id: string;
+  targetKind: "user" | "organization";
+  targetValue: string;
+  expiresAt: number | null;
+  canDownload: boolean;
 }
-function ShareControls({entry,viewers,organizations,onVisibility,onGrant}:{entry:HistoryEntry;viewers:AuthUser[];organizations:OrganizationTarget[];onVisibility:(value:ReportVisibility)=>void;onGrant:(input:{targetKind:"user"|"organization";targetValue:string;expiresAt:number|null;canDownload:boolean;shared:boolean})=>void}){
- const[kind,setKind]=useState<"user"|"organization">("user");const[target,setTarget]=useState("");const[expires,setExpires]=useState("");const[canDownload,setCanDownload]=useState(false);const defaultTarget=kind==="user"?viewers[0]?.id:organizations[0]?.key;const labels=new Map([...viewers.map(item=>[item.id,item.name] as const),...organizations.map(item=>[item.key,`${item.name} · ${item.type}`] as const)]);
- return <div className="mt-3 space-y-2 rounded-md border border-line bg-background/60 p-2"><label className="flex items-center justify-between gap-2 text-xs"><span>可见级别</span><select value={entry.visibility} onChange={event=>onVisibility(event.target.value as ReportVisibility)} className="rounded-md border border-line bg-surface-1 px-2 py-1"><option value="internal">Internal · 内部</option><option value="partner">Partner · 合作方</option><option value="public">Public · 公开</option></select></label>{entry.visibility==="internal"?<p className="text-[11px] text-soft">仅所有者与 Admin 可见，切换为 Partner 后才能分享。</p>:<><div className="grid grid-cols-2 gap-2"><select value={kind} onChange={event=>{setKind(event.target.value as typeof kind);setTarget("");}} className="rounded-md border border-line bg-surface-1 px-2 py-1 text-xs"><option value="user">指定 Viewer</option><option value="organization">具体组织</option></select><select value={target||defaultTarget||""} onChange={event=>setTarget(event.target.value)} className="min-w-0 rounded-md border border-line bg-surface-1 px-2 py-1 text-xs">{kind==="user"?viewers.map(item=><option key={item.id} value={item.id}>{item.name}</option>):organizations.map(item=><option key={item.key} value={item.key}>{item.name} · {item.type}</option>)}</select></div><div className="grid grid-cols-2 gap-2"><input type="date" value={expires} onChange={event=>setExpires(event.target.value)} className="rounded-md border border-line bg-surface-1 px-2 py-1 text-xs"/><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={canDownload} onChange={event=>setCanDownload(event.target.checked)}/>允许下载</label></div><button disabled={!defaultTarget&&!target} onClick={()=>onGrant({targetKind:kind,targetValue:target||defaultTarget||"",expiresAt:expires?new Date(`${expires}T23:59:59`).getTime():null,canDownload,shared:true})} className="chip w-full justify-center disabled:opacity-40">添加授权</button>{entry.grants.map(grant=><div key={grant.id} className="flex items-center justify-between gap-2 rounded bg-surface-1 p-2 text-[11px]"><span className="truncate">{labels.get(grant.targetValue)??grant.targetValue} · {grant.canDownload?"可下载":"仅查看"}{grant.expiresAt?` · 至 ${new Date(grant.expiresAt).toLocaleDateString()}`:""}</span><button onClick={()=>onGrant({...grant,shared:false})} className="text-red-400">撤销</button></div>)}</>}</div>;
+interface OrganizationTarget {
+  key: string;
+  type: OrganizationType;
+  name: string;
+}
+export interface HistoryEntry {
+  id: string;
+  result: AnalyzeResult;
+  savedAt: string;
+  ownerId?: string;
+  visibility: ReportVisibility;
+  grants: Grant[];
+  canManage: boolean;
+  canDownload: boolean;
+}
+export async function saveReportHistory(result: AnalyzeResult) {
+  try {
+    const response = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ result }),
+    });
+    if (response.ok) window.dispatchEvent(new Event("cuvee-history-updated"));
+  } catch {}
+}
+export function ReportHistory({
+  onSelect,
+}: {
+  onSelect: (result: AnalyzeResult, access: { reportId: string; canDownload: boolean }) => void;
+}) {
+  const t = useT();
+  const { locale } = useI18n();
+  const { user } = useCurrentUser();
+  const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [viewers, setViewers] = useState<AuthUser[]>([]);
+  const [organizations, setOrganizations] = useState<OrganizationTarget[]>([]);
+  async function refresh() {
+    try {
+      const response = await fetch("/api/reports", { cache: "no-store" });
+      setEntries(
+        response.ok
+          ? ((await response.json()) as { reports: HistoryEntry[] }).reports.slice(0, HISTORY_LIMIT)
+          : [],
+      );
+    } catch {
+      setEntries([]);
+    }
+  }
+  useEffect(() => {
+    void refresh();
+    const handler = () => void refresh();
+    window.addEventListener("cuvee-history-updated", handler);
+    window.addEventListener("cuvee-auth-changed", handler);
+    return () => {
+      window.removeEventListener("cuvee-history-updated", handler);
+      window.removeEventListener("cuvee-auth-changed", handler);
+    };
+  }, []);
+  useEffect(() => {
+    if (!user || !hasPermission(user, "report:manage")) {
+      setViewers([]);
+      setOrganizations([]);
+      return;
+    }
+    void fetch("/api/users/share-targets", { cache: "no-store" }).then(async (response) => {
+      if (!response.ok) return;
+      const data = (await response.json()) as {
+        users: AuthUser[];
+        organizations: OrganizationTarget[];
+      };
+      setViewers(data.users);
+      setOrganizations(data.organizations);
+    });
+  }, [user]);
+  async function remove(id: string) {
+    if ((await fetch(`/api/reports/${id}`, { method: "DELETE" })).ok) void refresh();
+  }
+  async function setVisibility(id: string, visibility: ReportVisibility) {
+    if (
+      (
+        await fetch(`/api/reports/${id}/visibility`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ visibility }),
+        })
+      ).ok
+    )
+      void refresh();
+  }
+  async function setGrant(
+    entry: HistoryEntry,
+    input: {
+      targetKind: "user" | "organization";
+      targetValue: string;
+      expiresAt: number | null;
+      canDownload: boolean;
+      shared: boolean;
+    },
+  ) {
+    if (
+      (
+        await fetch(`/api/reports/${entry.id}/share`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(input),
+        })
+      ).ok
+    )
+      void refresh();
+  }
+  return (
+    <section className="border-line rounded-card border p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="kicker">{t("history.title")}</h3>
+        <span className="text-soft text-xs">
+          {entries.length}/{HISTORY_LIMIT}
+        </span>
+      </div>
+      {entries.length === 0 ? (
+        <p className="text-soft mt-3 text-xs">{t("history.empty")}</p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {entries.map((entry) => (
+            <li key={entry.id} className="border-line bg-surface-1 rounded-lg border p-3">
+              <button
+                onClick={() =>
+                  onSelect(entry.result, { reportId: entry.id, canDownload: entry.canDownload })
+                }
+                className="w-full text-left"
+              >
+                <span className="flex justify-between gap-3">
+                  <span>
+                    <strong className="block text-sm">{entry.result.region.name}</strong>
+                    <span className="text-soft text-xs">
+                      {entry.result.timeframe.start.slice(0, 4)} ·{" "}
+                      {new Date(entry.savedAt).toLocaleString(
+                        locale === "zh" ? "zh-CN" : locale === "fr" ? "fr-FR" : "en-US",
+                      )}
+                    </span>
+                  </span>
+                  <span className="font-mono text-sm">{entry.result.riskScore}/100</span>
+                </span>
+              </button>
+              <div className="border-line mt-2 flex items-center justify-between border-t pt-2">
+                <span className="kicker">
+                  {entry.visibility} · {entry.result.qualityBand ?? entry.result.riskBand}
+                </span>
+                {entry.canManage ? (
+                  <button
+                    onClick={() => void remove(entry.id)}
+                    className="text-soft text-xs hover:text-red-400"
+                  >
+                    {t("history.delete")}
+                  </button>
+                ) : null}
+              </div>
+              {entry.canManage ? (
+                <ShareControls
+                  entry={entry}
+                  viewers={viewers}
+                  organizations={organizations}
+                  onVisibility={(value) => void setVisibility(entry.id, value)}
+                  onGrant={(input) => void setGrant(entry, input)}
+                />
+              ) : (
+                <p className="text-soft mt-2 text-[11px]">
+                  {entry.canDownload ? "可查看和下载" : "仅查看，禁止下载"}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+function ShareControls({
+  entry,
+  viewers,
+  organizations,
+  onVisibility,
+  onGrant,
+}: {
+  entry: HistoryEntry;
+  viewers: AuthUser[];
+  organizations: OrganizationTarget[];
+  onVisibility: (value: ReportVisibility) => void;
+  onGrant: (input: {
+    targetKind: "user" | "organization";
+    targetValue: string;
+    expiresAt: number | null;
+    canDownload: boolean;
+    shared: boolean;
+  }) => void;
+}) {
+  const [kind, setKind] = useState<"user" | "organization">("user");
+  const [target, setTarget] = useState("");
+  const [expires, setExpires] = useState("");
+  const [canDownload, setCanDownload] = useState(false);
+  const defaultTarget = kind === "user" ? viewers[0]?.id : organizations[0]?.key;
+  const labels = new Map([
+    ...viewers.map((item) => [item.id, item.name] as const),
+    ...organizations.map((item) => [item.key, `${item.name} · ${item.type}`] as const),
+  ]);
+  return (
+    <div className="border-line mt-3 space-y-2 rounded-md border bg-background/60 p-2">
+      <label className="flex items-center justify-between gap-2 text-xs">
+        <span>可见范围</span>
+        <select
+          value={entry.visibility}
+          onChange={(event) => onVisibility(event.target.value as ReportVisibility)}
+          className="border-line bg-surface-1 rounded-md border px-2 py-1"
+        >
+          <option value="private">Private · 私有</option>
+          <option value="restricted">Restricted · 指定授权</option>
+          <option value="workspace">Workspace · 工作区</option>
+        </select>
+      </label>
+      {entry.visibility !== "restricted" ? (
+        <p className="text-soft text-[11px]">
+          {entry.visibility === "private"
+            ? "仅所有者与管理员可见。"
+            : "所有已登录的工作区成员均可查看。"}
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={kind}
+              onChange={(event) => {
+                setKind(event.target.value as typeof kind);
+                setTarget("");
+              }}
+              className="border-line bg-surface-1 rounded-md border px-2 py-1 text-xs"
+            >
+              <option value="user">指定用户</option>
+              <option value="organization">具体组织</option>
+            </select>
+            <select
+              value={target || defaultTarget || ""}
+              onChange={(event) => setTarget(event.target.value)}
+              className="border-line bg-surface-1 min-w-0 rounded-md border px-2 py-1 text-xs"
+            >
+              {kind === "user"
+                ? viewers.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {item.role}
+                    </option>
+                  ))
+                : organizations.map((item) => (
+                    <option key={item.key} value={item.key}>
+                      {item.name} · {item.type}
+                    </option>
+                  ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="date"
+              value={expires}
+              onChange={(event) => setExpires(event.target.value)}
+              className="border-line bg-surface-1 rounded-md border px-2 py-1 text-xs"
+            />
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={canDownload}
+                onChange={(event) => setCanDownload(event.target.checked)}
+              />
+              允许下载
+            </label>
+          </div>
+          <button
+            disabled={!defaultTarget && !target}
+            onClick={() =>
+              onGrant({
+                targetKind: kind,
+                targetValue: target || defaultTarget || "",
+                expiresAt: expires ? new Date(`${expires}T23:59:59`).getTime() : null,
+                canDownload,
+                shared: true,
+              })
+            }
+            className="chip w-full justify-center disabled:opacity-40"
+          >
+            添加授权
+          </button>
+          {entry.grants.map((grant) => (
+            <div
+              key={grant.id}
+              className="bg-surface-1 flex items-center justify-between gap-2 rounded p-2 text-[11px]"
+            >
+              <span className="truncate">
+                {labels.get(grant.targetValue) ?? grant.targetValue} ·{" "}
+                {grant.canDownload ? "可下载" : "仅查看"}
+                {grant.expiresAt ? ` · 至 ${new Date(grant.expiresAt).toLocaleDateString()}` : ""}
+              </span>
+              <button onClick={() => onGrant({ ...grant, shared: false })} className="text-red-400">
+                撤销
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
 }

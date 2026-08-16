@@ -161,49 +161,51 @@ export function demoGeoSignals(regionId: string, chateau?: string): GeoSignals {
 
 export function demoWineAnalysis(input: AnalyzeInput): AnalyzeResult {
   const score = input.region.parent === "burgundy" ? 62 : 48;
+  const isChinese = input.locale === "zh";
   return {
     region: input.region,
     timeframe: input.timeframe,
     persona: input.persona,
+    locale: input.locale ?? "en",
     riskScore: score,
     riskBand: bandOf(score),
     drivers: [
       {
         source: "weather",
-        signal: "Spring frost probability above 30-year baseline (+1.4σ)",
+        signal: isChinese ? "春季霜冻概率高于 30 年基准（+1.4σ）" : "Spring frost probability above 30-year baseline (+1.4σ)",
         weight: 0.42,
       },
-      { source: "geo", signal: "Slope/aspect mix amplifies frost pocket exposure", weight: 0.18 },
+      { source: "geo", signal: isChinese ? "坡度与朝向组合放大霜冻洼地暴露" : "Slope/aspect mix amplifies frost pocket exposure", weight: 0.18 },
       {
         source: "tavily",
-        signal: "Industry chatter: négociants reducing en primeur allocations",
+        signal: isChinese ? "行业信号显示酒商正在收缩期酒配额" : "Industry chatter: négociants reducing en primeur allocations",
         weight: 0.27,
       },
-      { source: "extraction", signal: "Compound risk: weather × demand softness", weight: 0.13 },
+      { source: "extraction", signal: isChinese ? "复合风险：天气压力叠加需求走弱" : "Compound risk: weather × demand softness", weight: 0.13 },
     ],
     recommendations:
       input.persona === "vineyard"
         ? [
             {
               persona: "vineyard",
-              action: "Deploy frost protection (candles/wind machines) week of bud-break",
+              action: isChinese ? "在萌芽周部署防霜措施（蜡烛或风机）" : "Deploy frost protection (candles/wind machines) week of bud-break",
               evidence: "weather.frost_probability",
             },
             {
               persona: "vineyard",
-              action: "Hold back 10–15% allocation; pricing power likely improves Q3",
+              action: isChinese ? "预留 10–15% 配额；预计第三季度定价能力改善" : "Hold back 10–15% allocation; pricing power likely improves Q3",
               evidence: "tavily.market_sentiment",
             },
           ]
         : [
             {
               persona: "trade",
-              action: "Lock in 2024 vintage allocations early — supply tightening probable",
+              action: isChinese ? "尽早锁定 2024 年份配额，供应可能趋紧" : "Lock in 2024 vintage allocations early — supply tightening probable",
               evidence: "weather + tavily",
             },
             {
               persona: "trade",
-              action: "Diversify into Saint-Émilion satellites as Bordeaux hedge",
+              action: isChinese ? "配置圣埃美隆卫星产区，作为波尔多风险对冲" : "Diversify into Saint-Émilion satellites as Bordeaux hedge",
               evidence: "geo.appellation_substitution",
             },
           ],
@@ -218,7 +220,9 @@ export function demoWineAnalysis(input: AnalyzeInput): AnalyzeResult {
       score < 25 ? "Great" : score < 50 ? "Excellent" : score < 65 ? "Good" : score < 80 ? "Average" : "Poor",
     activeGates: [],
     rationale:
-      "Demo-mode placeholder: weighted base from sub-agent stubs, gated by spring-frost signal and softening market sentiment.",
+      isChinese
+        ? "演示模式占位结果：基于子智能体模拟信号的加权判断，主要受春季霜冻和市场情绪走弱影响。"
+        : "Demo-mode placeholder: weighted base from sub-agent stubs, gated by spring-frost signal and softening market sentiment.",
     feature: demoFeature(input, score),
     geoSnapshot: demoGeoSignals(input.region.id),
     backtest: demoBacktestIfHistorical(input, score),
@@ -304,6 +308,33 @@ function demoFeature(input: AnalyzeInput, score: number) {
   const region = input.region.name;
   const persona = input.persona;
   const isVineyard = persona === "vineyard";
+  if (input.locale === "zh") {
+    return {
+      executiveSummary: `${region} 当前年份面临较高风险窗口，主要由春季霜冻概率高于 30 年基准驱动。${isVineyard ? "葡萄园端应优先落实防霜与采收前风险管理。" : "贸易端应审慎安排配额，并分散采购来源。"}`,
+      reportMarkdown: [
+        `# 年份展望 — ${region}`,
+        "",
+        "## 风险概览",
+        `- **风险评分：** ${score}/100`,
+        `- **使用场景：** ${isVineyard ? "葡萄园" : "贸易"}`,
+        `- **时间范围：** ${input.timeframe.start} → ${input.timeframe.end}`,
+        "",
+        "## 主要驱动因素",
+        "- 春季霜冻概率比 30 年基准高出 +1.4σ。",
+        "- 产区的坡度与朝向组合放大了霜冻洼地的暴露。",
+        "- 公开市场信号显示酒商正在收缩期酒配额。",
+        "",
+        `## 建议（${isVineyard ? "葡萄园" : "贸易"}）`,
+        isVineyard
+          ? "- 在萌芽周部署防霜措施（蜡烛或风机）。\n- 预留 10–15% 配额，等待第三季度价格信号。"
+          : "- 尽早锁定 2024 年份配额，以应对潜在供应收紧。\n- 配置圣埃美隆卫星产区，分散波尔多风险。",
+        "",
+        "## 注意事项",
+        "本报告基于演示数据生成。配置 LLM 提供商后，可获得结合实时证据的完整分析。",
+      ].join("\n"),
+      emailDigest: `**每周展望 — ${region}**\n\n风险评分 **${score}/100**。本周期的主导因素是春季霜冻风险。`,
+    };
+  }
   return {
     executiveSummary: `${region} faces an elevated risk window in the current vintage outlook, driven primarily by spring frost probability above the 30-year baseline. Persona context: ${persona}.`,
     reportMarkdown: [

@@ -155,6 +155,8 @@ export interface AnalyzeResult {
   region: AnalyzeInput["region"];
   timeframe: Timeframe;
   persona: Persona;
+  /** Language used for generated prose. Historical reports preserve this value. */
+  locale?: AnalysisLocale;
   riskScore: number;
   riskBand: RiskBand;
   drivers: RiskDriver[];

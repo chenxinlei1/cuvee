@@ -1,6 +1,6 @@
 "use client";
 
-import { useT } from "@/lib/i18n/Provider";
+import { useI18n, useT } from "@/lib/i18n/Provider";
 import { BacktestCard } from "@/components/wine/BacktestCard";
 import { ExecutiveSummary } from "@/components/wine/ExecutiveSummary";
 import { FullReportCard } from "@/components/wine/FullReportCard";
@@ -25,12 +25,15 @@ interface Props {
  * Drawer content shown when the analysis flow returns a result. The shell
  * wraps this with a glass-strong panel + close button + scroll container.
  */
-export function AnalysisDrawer({ result, persona, reportId, canDownload=true }: Props) {
+export function AnalysisDrawer({ result, persona, reportId, canDownload = true }: Props) {
   const t = useT();
+  const { locale } = useI18n();
+  const languageNames = { en: "English", fr: "français", zh: "中文" } as const;
+  const hasDifferentReportLanguage = result.locale && result.locale !== locale;
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
+      <header className="border-line flex flex-wrap items-end justify-between gap-4 border-b pb-5">
         <div>
           <p className="kicker">{t(`persona.${persona}`)}</p>
           <h2 className="mt-2 font-serif text-2xl font-medium leading-tight tracking-tight">
@@ -54,6 +57,12 @@ export function AnalysisDrawer({ result, persona, reportId, canDownload=true }: 
           />
         </div>
       </header>
+
+      {hasDifferentReportLanguage && result.locale && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {t("common.report_language_notice", { language: languageNames[result.locale] })}
+        </p>
+      )}
 
       <div className="space-y-6">
         {result.feature?.executiveSummary && (

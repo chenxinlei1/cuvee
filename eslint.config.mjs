@@ -8,6 +8,16 @@ const __dirname = dirname(__filename);
 const compat = new FlatCompat({ baseDirectory: __dirname });
 
 const config = [
+  {
+    ignores: [
+      ".next/**",
+      "docs/ui-references/**",
+      "data/**",
+      "node_modules/**",
+      "next-env.d.ts",
+      "scripts/_server-only-shim.cjs",
+    ],
+  },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {

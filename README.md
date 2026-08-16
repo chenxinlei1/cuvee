@@ -115,15 +115,15 @@ it cannot sign in until an Admin approves it and assigns the final role. Admin m
 an active user directly, change roles, disable/enable accounts, and cannot alter their own role
 or status accidentally.
 
-Reports carry an explicit visibility level: `internal` (owner + Admin only), `partner`
-(explicit user/organization grants), or `public` (authenticated workspace visibility). A grant
-may target one Viewer or an organization type, expire at a fixed time, and independently allow
-or deny Word download. Public visibility does not imply download permission; legacy shares are
+Reports carry an explicit visibility level: `private` (owner + Admin only), `restricted`
+(explicit user/organization grants), or `workspace` (authenticated workspace visibility). A grant
+may target an active user or an organization, expire at a fixed time, and independently allow
+or deny Word download. Workspace visibility does not imply download permission; legacy shares are
 migrated as view-only.
 
-Organization classification also drives the workspace experience after approval: Château users
-land in Vineyard, négociants and distributors land in Trade, buyers land in Reports, and Admins
-land in the AOS management console. Château registration uses the bundled classed-growth list
+Organization classification chooses the default workspace after approval; it never grants
+capabilities. Analysts land in Vineyard or Trade according to organization type, Viewers land in
+Reports, and Admins land in the AOS management console. Château registration uses the bundled classed-growth list
 instead of free text. Organization grants target the exact `type + organization name` pair, so a
 report shared with one buyer group is not exposed to every buyer organization.
 

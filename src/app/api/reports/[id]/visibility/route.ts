@@ -1,3 +1,19 @@
-import {NextResponse} from "next/server";import{z}from"zod";import{currentUser}from"@/lib/auth/session";import{setReportVisibility,writeAuditLog}from"@/lib/auth/db";
-const Body=z.object({visibility:z.enum(["internal","partner","public"])});
-export async function PATCH(request:Request,{params}:{params:Promise<{id:string}>}){const user=await currentUser();if(!user)return NextResponse.json({error:"Unauthorized"},{status:401});if(user.role==="viewer")return NextResponse.json({error:"Forbidden"},{status:403});const parsed=Body.safeParse(await request.json().catch(()=>null));if(!parsed.success)return NextResponse.json({error:"Invalid visibility"},{status:400});const{id}=await params;const ok=await setReportVisibility(user,id,parsed.data.visibility);if(!ok)return NextResponse.json({error:"Not found"},{status:404});await writeAuditLog(user.id,"report.visibility","report",id,parsed.data);return NextResponse.json({ok:true});}
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { currentUser } from "@/lib/auth/session";
+import { hasPermission } from "@/lib/auth/types";
+import { setReportVisibility, writeAuditLog } from "@/lib/auth/db";
+const Body = z.object({ visibility: z.enum(["private", "restricted", "workspace"]) });
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!hasPermission(user, "report:manage"))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const parsed = Body.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid visibility" }, { status: 400 });
+  const { id } = await params;
+  const ok = await setReportVisibility(user, id, parsed.data.visibility);
+  if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  await writeAuditLog(user.id, "report.visibility", "report", id, parsed.data);
+  return NextResponse.json({ ok: true });
+}
