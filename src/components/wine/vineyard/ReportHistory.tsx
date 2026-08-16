@@ -310,7 +310,7 @@ function ShareControls({
               <span className="truncate">
                 {labels.get(grant.targetValue) ?? grant.targetValue} ·{" "}
                 {grant.canDownload ? "可下载" : "仅查看"}
-                {grant.expiresAt ? ` · 至 ${new Date(grant.expiresAt).toLocaleDateString()}` : ""}
+                {grant.expiresAt ? ` · 至 ${new Date(grant.expiresAt).toISOString().slice(0, 10)}` : ""}
               </span>
               <button onClick={() => onGrant({ ...grant, shared: false })} className="text-red-400">
                 撤销

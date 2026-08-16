@@ -40,12 +40,11 @@ const FILTERS: Array<"all" | TaskStatus> = [
 
 function time(ms: number | null | undefined): string {
   if (!ms) return "—";
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Deterministic UTC rendering — locale-sensitive formatting (toLocaleString)
+  // renders differently on the server vs the browser and breaks hydration.
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
 }
 
 export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
