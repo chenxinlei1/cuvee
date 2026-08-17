@@ -1,9 +1,15 @@
 import "server-only";
-type MailKind = "verify" | "reset";
+type MailKind = "verify" | "reset" | "invite";
 export async function sendAuthMail(input: { to: string; name: string; url: string; kind: MailKind }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY, from = process.env.CUVEE_MAIL_FROM;
-  const subject = input.kind === "verify" ? "Verify your Cuvée email" : "Reset your Cuvée password";
-  const action = input.kind === "verify" ? "Verify email" : "Reset password";
+  const subject =
+    input.kind === "verify"
+      ? "Verify your Cuvée email"
+      : input.kind === "invite"
+        ? "Invitation to Cuvée"
+        : "Reset your Cuvée password";
+  const action =
+    input.kind === "verify" ? "Verify email" : input.kind === "invite" ? "Accept invitation" : "Reset password";
   if (!apiKey || !from) {
     if (process.env.NODE_ENV !== "production") console.info(`[Cuvée mail] ${subject}: ${input.url}`);
     else throw new Error("Email delivery is not configured");

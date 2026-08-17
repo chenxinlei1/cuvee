@@ -36,6 +36,11 @@ export function AuthNav() {
           Platform Admin
         </Link>
       ) : null}
+      {hasPermission(user, "user:manage:organization") && !hasPermission(user, "user:manage") ? (
+        <Link href="/admin/organizations" className="chip">
+          Org Admin
+        </Link>
+      ) : null}
       <Link href="/account/security" className="border-line hidden rounded-pill border px-3 py-2 text-xs md:inline">
         {user.name} ·{" "}
         <span className="text-soft uppercase">

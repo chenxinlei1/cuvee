@@ -43,7 +43,7 @@ workspace, buyer roles in the Trade workspace, and users without
 | `document:manage` | Upload and remove organization documents |
 | `document:read:any` | Read any document across organizations (platform scope) |
 | `user:manage` | Create/edit users, change roles and account status |
-| `user:manage:organization` | Manage users within one's own organization (defined; admin UI is platform-focused today) |
+| `user:manage:organization` | Manage members and roles of one's own organization (invite, role change, enable/disable) — see the Organizations page at `/admin/organizations` |
 | `role:manage` | Edit the role → permission matrix |
 
 ## Default Access Matrix
@@ -75,6 +75,11 @@ Functional permissions answer "what can you do"; organizational scope answers
 - Workspace access is an explicit permission (`workspace:vineyard` /
   `workspace:trade`), not a client-side role check — a role change is
   immediately reflected in what a session may do.
+- Organization admins (`user:manage:organization`) manage **their own
+  organization only**: `/admin/organizations` lists just their org, invites
+  are restricted to the organization's side (château → winery roles;
+  négociant/distributor/buyer → buyer roles), they cannot modify platform
+  admins or themselves, and cross-organization access is always rejected.
 
 ## Hard protections
 

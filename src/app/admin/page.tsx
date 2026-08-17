@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { currentUser } from "@/lib/auth/session";
 import { hasPermission, ROLE_LABELS } from "@/lib/auth/types";
 import { listAccessRoles, listAuditLogs, listPermissionDefinitions, listUsers } from "@/lib/auth/db";
@@ -62,6 +63,12 @@ export default async function AdminPage() {
           </div>
         </div>
       </header>
+
+      <div className="mt-4 flex justify-end">
+        <Link href="/admin/organizations" className="chip">
+          Organizations
+        </Link>
+      </div>
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <UserManager initialUsers={users} currentUserId={user.id} />

@@ -65,7 +65,12 @@ export function UserManager({
   }
 
   async function removeUser(item: ManagedUser) {
-    if (!window.confirm(`Permanently delete ${item.name} (${item.email})? Their reports and documents will be transferred to your account.`)) return;
+    if (
+      !window.confirm(
+        `Permanently delete ${item.name} (${item.email})? Their reports and documents will be transferred to your account.`,
+      )
+    )
+      return;
     setError(null);
     const response = await fetch(`/api/admin/users/${item.id}`, { method: "DELETE" });
     const data = (await response.json()) as { error?: string };
@@ -157,8 +162,8 @@ export function UserManager({
                 required
                 name="password"
                 type="password"
-                minLength={10}
-                placeholder="10+ characters"
+                minLength={12}
+                placeholder="12+ characters"
                 className="admin-input"
               />
             </Field>
@@ -296,7 +301,9 @@ export function UserManager({
                 {!isCurrentUser ? (
                   <button
                     type="button"
-                    onClick={() => setResettingUserId((value) => value === item.id ? null : item.id)}
+                    onClick={() =>
+                      setResettingUserId((value) => (value === item.id ? null : item.id))
+                    }
                     className="decoration-line-strong text-xs font-semibold underline underline-offset-4 transition hover:text-accent"
                   >
                     Reset password
@@ -313,9 +320,22 @@ export function UserManager({
                 ) : null}
               </div>
               {resettingUserId === item.id ? (
-                <form onSubmit={(event) => void resetPassword(event, item.id)} className="flex gap-2 lg:col-span-4 lg:justify-end">
-                  <input required name="password" type="password" minLength={12} autoComplete="new-password" placeholder="Temporary password · 12+ characters" className="admin-input max-w-sm" />
-                  <button className="rounded-full bg-foreground px-4 py-2 text-xs font-bold text-background">Save password</button>
+                <form
+                  onSubmit={(event) => void resetPassword(event, item.id)}
+                  className="flex gap-2 lg:col-span-4 lg:justify-end"
+                >
+                  <input
+                    required
+                    name="password"
+                    type="password"
+                    minLength={12}
+                    autoComplete="new-password"
+                    placeholder="Temporary password · 12+ characters"
+                    className="admin-input max-w-sm"
+                  />
+                  <button className="rounded-full bg-foreground px-4 py-2 text-xs font-bold text-background">
+                    Save password
+                  </button>
                 </form>
               ) : null}
             </article>

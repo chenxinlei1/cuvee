@@ -270,6 +270,19 @@ filter (queued / running / completed / failed / cancelled), stage + progress,
 owner and request summary, error details, plus **cancel queued tasks** and
 **retry failed tasks** (both audit-logged).
 
+#### Multi-organization management
+
+Organizations are first-class tenants: platform admins create organizations
+and manage any of them, while organization admins (`user:manage:organization`,
+the default for `wineryAdmin` / `buyerAdmin`) manage **their own organization**
+at `/admin/organizations` — invite members (email invite with a setup link,
+7-day validity), change roles within the organization's side (château →
+winery roles; négociant/distributor/buyer → buyer roles), and enable/disable
+members. Invited members set their own password through the existing reset
+flow, which activates the account on first use. Every invite, role change,
+and disable is audit-logged, and cross-organization management is rejected at
+the API layer.
+
 ### Useful scripts
 
 | Command | Purpose |

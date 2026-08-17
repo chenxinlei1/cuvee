@@ -40,22 +40,51 @@ export function hasPermission(user: AuthUser, permission: Permission): boolean {
 }
 
 export function canAccessVineyard(user: AuthUser): boolean {
-  return (
-    hasPermission(user, "analysis:run") && hasPermission(user, "workspace:vineyard")
-  );
+  return hasPermission(user, "analysis:run") && hasPermission(user, "workspace:vineyard");
 }
 
 export function canAccessTrade(user: AuthUser): boolean {
-  return (
-    hasPermission(user, "analysis:run") && hasPermission(user, "workspace:trade")
-  );
+  return hasPermission(user, "analysis:run") && hasPermission(user, "workspace:trade");
 }
 
 export function canManageReport(user: AuthUser, ownerId: string, organizationId?: string): boolean {
   return (
     hasPermission(user, "report:manage") &&
-    (hasPermission(user, "report:read:any") || user.id === ownerId || (Boolean(user.organizationId) && user.organizationId === organizationId))
+    (hasPermission(user, "report:read:any") ||
+      user.id === ownerId ||
+      (Boolean(user.organizationId) && user.organizationId === organizationId))
   );
+}
+
+/**
+ * Organization-scoped management: platform admins (user:manage) manage any
+ * organization; org admins (user:manage:organization) manage their own only.
+ */
+export function canManageOrganization(user: AuthUser, organizationId?: string | null): boolean {
+  return (
+    hasPermission(user, "user:manage") ||
+    (hasPermission(user, "user:manage:organization") &&
+      Boolean(user.organizationId) &&
+      user.organizationId === organizationId)
+  );
+}
+
+/** Roles an organization admin may assign, by organization side. */
+export function rolesAllowedForOrganization(
+  organizationType: OrganizationType | undefined | null,
+): Role[] {
+  if (organizationType === "chateau") return ["wineryAdmin", "wineryStaff"];
+  if (["negociant", "distributor", "buyer"].includes(organizationType ?? ""))
+    return ["buyerAdmin", "buyerStaff"];
+  return [];
+}
+
+export function organizationAdminRole(
+  organizationType: OrganizationType | undefined | null,
+): Role | undefined {
+  if (organizationType === "chateau") return "wineryAdmin";
+  if (["negociant", "distributor", "buyer"].includes(organizationType ?? "")) return "buyerAdmin";
+  return undefined;
 }
 
 export function defaultAppPath(user: AuthUser): string {

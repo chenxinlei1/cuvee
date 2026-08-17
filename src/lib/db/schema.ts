@@ -77,7 +77,11 @@ export const userRoles = pgTable("user_roles", {
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 }, (table) => [primaryKey({ columns: [table.userId, table.roleId] })]);
 
-export const authTokenTypeEnum = pgEnum("auth_token_type", ["email_verification", "password_reset"]);
+export const authTokenTypeEnum = pgEnum("auth_token_type", [
+  "email_verification",
+  "password_reset",
+  "invite",
+]);
 export const authTokens = pgTable(
   "auth_tokens",
   {

@@ -3,9 +3,12 @@ import { z } from "zod";
 import { currentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/types";
 import { deleteUser, resetPassword, updateUser, writeAuditLog } from "@/lib/auth/db";
+import { isSameOrigin } from "@/lib/auth/request-security";
 const Body = z
   .object({
-    role: z.enum(["platformAdmin", "wineryAdmin", "wineryStaff", "buyerAdmin", "buyerStaff"]).optional(),
+    role: z
+      .enum(["platformAdmin", "wineryAdmin", "wineryStaff", "buyerAdmin", "buyerStaff"])
+      .optional(),
     status: z.enum(["pending", "active", "disabled"]).optional(),
     organizationType: z.enum(["chateau", "negociant", "distributor", "buyer"]).optional(),
     organizationName: z.string().trim().min(2).max(120).optional(),
@@ -13,6 +16,8 @@ const Body = z
   })
   .refine((value) => Object.values(value).some((item) => item !== undefined));
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameOrigin(request))
+    return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   const actor = await currentUser();
   if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!hasPermission(actor, "user:manage"))
@@ -25,7 +30,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       { error: "You cannot change your own role or status" },
       { status: 400 },
     );
-  const ok = await updateUser(id, parsed.data);
+  let ok: boolean;
+  try {
+    ok = await updateUser(id, parsed.data);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (code === "ROLE_NOT_ALLOWED")
+      return NextResponse.json(
+        { error: "Role is not allowed for this organization" },
+        { status: 400 },
+      );
+    if (code === "LAST_ORG_ADMIN")
+      return NextResponse.json(
+        { error: "The organization must retain an active administrator" },
+        { status: 409 },
+      );
+    throw error;
+  }
   if (!ok) return NextResponse.json({ error: "User not found" }, { status: 404 });
   if (parsed.data.password !== undefined && !(await resetPassword(id, parsed.data.password)))
     return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -39,7 +60,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameOrigin(request))
+    return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   const actor = await currentUser();
   if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!hasPermission(actor, "user:manage"))
@@ -52,7 +75,15 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if (result === "not_found")
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     if (result === "last_admin")
-      return NextResponse.json({ error: "The last active platform admin cannot be deleted" }, { status: 409 });
+      return NextResponse.json(
+        { error: "The last active platform admin cannot be deleted" },
+        { status: 409 },
+      );
+    if (result === "last_org_admin")
+      return NextResponse.json(
+        { error: "The organization must retain an active administrator" },
+        { status: 409 },
+      );
     await writeAuditLog(actor.id, "user.delete", "user", id, { ownershipTransferredTo: actor.id });
     return NextResponse.json({ ok: true });
   } catch {
