@@ -1,0 +1,21 @@
+The application requires a migrated PostgreSQL database. Run `pnpm db:migrate`
+from a trusted checkout before the first install and schema-changing upgrades.
+
+1. Create the required Secret before installing:
+
+   kubectl -n {{ .Release.Namespace }} create secret generic {{ .Values.existingSecret }} \
+     --from-literal=DATABASE_URL='postgresql://...' \
+     --from-literal=CUVEE_AUTH_SECRET='...' \
+     --from-literal=CUVEE_DOWNLOAD_SECRET='...' \
+     --from-literal=OPENAI_API_KEY='...'
+
+2. Check the rollout:
+
+   kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "cuvee.fullname" . }}
+{{- if .Values.worker.enabled }}
+   kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "cuvee.fullname" . }}-worker
+{{- end }}
+
+3. Without Ingress, forward the Service locally:
+
+   kubectl -n {{ .Release.Namespace }} port-forward service/{{ include "cuvee.fullname" . }} 3000:{{ .Values.service.port }}

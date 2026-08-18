@@ -30,6 +30,7 @@
     "test": "pnpm test:security && pnpm test:unit && pnpm test:rbac && pnpm test:report-auth && pnpm test:tasks && pnpm test:org-admin",
     "db:backup": "docker compose run --rm -e BACKUP_LOOP=false backup",
     "db:restore": "sh scripts/restore-postgres.sh",
+    "db:seed:demo-users": "node --import tsx scripts/seed-demo-users.ts",
     "export:tavily-cache": "node --import tsx --require ./scripts/_server-only-shim.cjs scripts/export-tavily-cache.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

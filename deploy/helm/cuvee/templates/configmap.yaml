@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cuvee.fullname" . }}
+  labels:
+    {{- include "cuvee.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.config }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  CUVEE_DATA_DIR: {{ ternary "/persistent" "/app/data" .Values.persistence.enabled | quote }}

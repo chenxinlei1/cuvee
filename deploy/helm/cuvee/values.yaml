@@ -1,0 +1,106 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/chenxinlei1/cuvee
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 1001
+  fsGroupChangePolicy: OnRootMismatch
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1001
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: cuvee.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 384Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+worker:
+  enabled: true
+  replicaCount: 2
+  concurrency: 2
+  pollMs: 1500
+  staleMs: 60000
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+workerAutoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 75
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+persistence:
+  enabled: false
+  accessModes: ["ReadWriteOnce"]
+  size: 2Gi
+  storageClass: ""
+
+config:
+  NEXT_PUBLIC_APP_URL: https://cuvee.example.com
+  NEXT_PUBLIC_DEMO_MODE: "false"
+  NEXT_PUBLIC_DEMO_FAST: "true"
+  CUVEE_LLM_PROVIDER: openai
+  CUVEE_MEMORY_DISABLED: "true"
+  CUVEE_TASK_TTL_MS: "86400000"
+
+# Create this Secret outside Helm (recommended). Required keys:
+# DATABASE_URL, CUVEE_AUTH_SECRET, CUVEE_DOWNLOAD_SECRET. Provider and email
+# keys such as OPENAI_API_KEY, TAVILY_API_KEY and RESEND_API_KEY are optional.
+existingSecret: cuvee-secrets
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

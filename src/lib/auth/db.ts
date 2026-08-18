@@ -141,16 +141,20 @@ export async function userStatusByEmail(email: string): Promise<string | null> {
     )?.status ?? null
   );
 }
-export async function findUserById(id: string): Promise<AuthUser | null> {
+async function findUserByIdWithStatus(id: string, activeOnly: boolean): Promise<AuthUser | null> {
   const row = await one<Omit<UserRow, "password_hash">>(
     `SELECT u.id,u.email,u.name,ar.key role,o.id organization_id,o.type organization_type,o.name organization_name,
       ARRAY_REMOVE(ARRAY_AGG(DISTINCT rp.permission_key),NULL) permissions
      FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN access_roles ar ON ar.id=ur.role_id
      LEFT JOIN organizations o ON o.id=ur.organization_id LEFT JOIN role_permissions rp ON rp.role_id=ar.id
-     WHERE u.id=$1 AND u.status='active' GROUP BY u.id,ar.key,o.id,o.type,o.name`,
+     WHERE u.id=$1${activeOnly ? " AND u.status='active'" : ""} GROUP BY u.id,ar.key,o.id,o.type,o.name`,
     [id],
   );
   return row ? rowUser(row) : null;
+}
+
+export async function findUserById(id: string): Promise<AuthUser | null> {
+  return findUserByIdWithStatus(id, true);
 }
 export async function listUsers(): Promise<
   Array<AuthUser & { status: string; createdAt: number }>
@@ -221,7 +225,7 @@ export async function createUser(input: {
     if ((error as { code?: string }).code === "23505") throw new Error("EMAIL_EXISTS");
     throw error;
   }
-  const created = await findUserById(id);
+  const created = await findUserByIdWithStatus(id, false);
   if (!created) throw new Error("USER_CREATE_FAILED");
   return {
     ...created,

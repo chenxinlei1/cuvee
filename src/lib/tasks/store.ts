@@ -82,6 +82,130 @@ export async function insertAnalysisTask(
   return id;
 }
 
+/** Create non-executable task fixtures for the development admin dashboard. */
+export async function insertDemoTasks(user: AuthUser): Promise<string[]> {
+  const now = Date.now();
+  const fixtures: Array<{
+    input: AnalyzeInput & { demoFixture: true };
+    status: TaskStatus;
+    stage: string;
+    progress: number;
+    createdAt: number;
+    startedAt: number | null;
+    finishedAt: number | null;
+    error: string | null;
+  }> = [
+    {
+      input: {
+        demoFixture: true,
+        region: { id: "medoc", name: "Medoc", parent: "bordeaux" },
+        timeframe: { start: "2026-01-01", end: "2026-12-31" },
+        persona: "vineyard",
+        locale: "zh",
+        question: "演示任务：等待 worker 分配",
+      },
+      status: "pending",
+      stage: "queued",
+      progress: 0,
+      createdAt: now,
+      startedAt: null,
+      finishedAt: null,
+      error: null,
+    },
+    {
+      input: {
+        demoFixture: true,
+        region: { id: "pauillac", name: "Pauillac", parent: "bordeaux" },
+        timeframe: { start: "2025-01-01", end: "2025-12-31" },
+        persona: "trade",
+        tradePersona: "merchant",
+        locale: "zh",
+        chateau: "Chateau Latour",
+      },
+      status: "running",
+      stage: "collecting signals",
+      progress: 58,
+      createdAt: now - 70_000,
+      startedAt: now - 42_000,
+      finishedAt: null,
+      error: null,
+    },
+    {
+      input: {
+        demoFixture: true,
+        region: { id: "cote-de-nuits", name: "Cote de Nuits", parent: "burgundy" },
+        timeframe: { start: "2024-01-01", end: "2024-12-31" },
+        persona: "vineyard",
+        locale: "zh",
+      },
+      status: "completed",
+      stage: "complete",
+      progress: 100,
+      createdAt: now - 220_000,
+      startedAt: now - 190_000,
+      finishedAt: now - 24_000,
+      error: null,
+    },
+    {
+      input: {
+        demoFixture: true,
+        region: { id: "saint-emilion", name: "Saint-Emilion", parent: "bordeaux" },
+        timeframe: { start: "2023-01-01", end: "2023-12-31" },
+        persona: "trade",
+        tradePersona: "restaurant",
+        locale: "zh",
+      },
+      status: "failed",
+      stage: "failed",
+      progress: 36,
+      createdAt: now - 140_000,
+      startedAt: now - 95_000,
+      finishedAt: now - 61_000,
+      error: "Demo failure: upstream weather provider timed out after 30 seconds.",
+    },
+  ];
+  const ids = fixtures.map(() => randomUUID());
+
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "DELETE FROM analysis_tasks WHERE owner_id=$1 AND input->>'demoFixture'='true'",
+      [user.id],
+    );
+    for (const [index, fixture] of fixtures.entries()) {
+      await client.query(
+        `INSERT INTO analysis_tasks(
+           id,owner_id,organization_id,input,status,stage,progress,error,
+           heartbeat,created_at,started_at,finished_at
+         ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [
+          ids[index],
+          user.id,
+          user.organizationId ?? null,
+          fixture.input,
+          fixture.status,
+          fixture.stage,
+          fixture.progress,
+          fixture.error,
+          fixture.status === "running" ? now + 24 * 60 * 60_000 : now,
+          fixture.createdAt,
+          fixture.startedAt,
+          fixture.finishedAt,
+        ],
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return ids;
+}
+
 /**
  * Claim one queued task, or re-claim a running task whose heartbeat is stale
  * (crashed worker). Uses `FOR UPDATE SKIP LOCKED` so multiple app instances
@@ -99,7 +223,8 @@ export async function claimNextTask(staleMs: number): Promise<ClaimedTask | null
      SET status='running', started_at=COALESCE(started_at,$2), heartbeat=$2, stage='starting'
      WHERE id=(
        SELECT id FROM analysis_tasks
-       WHERE status='pending' OR (status='running' AND (heartbeat IS NULL OR heartbeat < $1))
+       WHERE COALESCE(input->>'demoFixture','false') <> 'true'
+         AND (status='pending' OR (status='running' AND (heartbeat IS NULL OR heartbeat < $1)))
        ORDER BY created_at ASC
        LIMIT 1
        FOR UPDATE SKIP LOCKED

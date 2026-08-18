@@ -5,6 +5,7 @@ import { hasPermission, ROLE_LABELS } from "@/lib/auth/types";
 import { listAccessRoles, listAuditLogs, listPermissionDefinitions, listUsers } from "@/lib/auth/db";
 import { listTasksForAdmin } from "@/lib/tasks/store";
 import { UserManager } from "@/components/admin/UserManager";
+import type { UserFilter } from "@/components/admin/UserManager";
 import { RoleManager } from "@/components/admin/RoleManager";
 import { TaskQueue } from "@/components/admin/TaskQueue";
 
@@ -23,7 +24,11 @@ function actionLabel(action: string) {
   return ACTION_LABELS[action] ?? action.replaceAll(".", " · ").replaceAll("_", " ");
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ users?: string }>;
+}) {
   const user = await currentUser();
   if (!user) redirect("/login");
   if (!hasPermission(user, "user:manage")) redirect("/vineyard");
@@ -38,6 +43,12 @@ export default async function AdminPage() {
   const activeUsers = users.filter((item) => item.status === "active").length;
   const pendingUsers = users.filter((item) => item.status === "pending").length;
   const platformAdmins = users.filter((item) => item.role === "platformAdmin").length;
+  const requestedFilter = (await searchParams).users;
+  const userFilter: UserFilter = ["active", "pending", "platformAdmin"].includes(
+    requestedFilter ?? "",
+  )
+    ? (requestedFilter as UserFilter)
+    : "all";
 
   return (
     <main className="container mx-auto max-w-7xl px-5 py-8 sm:px-7 lg:py-10">
@@ -57,9 +68,24 @@ export default async function AdminPage() {
             </p>
           </div>
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <Metric value={activeUsers} label="Active" tone="green" />
-            <Metric value={pendingUsers} label="Pending" tone="amber" />
-            <Metric value={platformAdmins} label={ROLE_LABELS.platformAdmin} tone="neutral" />
+            <Metric
+              value={activeUsers}
+              label="Active"
+              tone="green"
+              href="/admin?users=active#users"
+            />
+            <Metric
+              value={pendingUsers}
+              label="Pending"
+              tone="amber"
+              href="/admin?users=pending#users"
+            />
+            <Metric
+              value={platformAdmins}
+              label={ROLE_LABELS.platformAdmin}
+              tone="neutral"
+              href="/admin?users=platformAdmin#users"
+            />
           </div>
         </div>
       </header>
@@ -71,7 +97,11 @@ export default async function AdminPage() {
       </div>
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <UserManager initialUsers={users} currentUserId={user.id} />
+        <UserManager
+          initialUsers={users}
+          currentUserId={user.id}
+          initialFilter={userFilter}
+        />
 
         <aside className="card-lg overflow-hidden xl:sticky xl:top-20">
           <div className="border-line flex items-center justify-between border-b px-5 py-4">
@@ -122,10 +152,12 @@ function Metric({
   value,
   label,
   tone,
+  href,
 }: {
   value: number;
   label: string;
   tone: "green" | "amber" | "neutral";
+  href: string;
 }) {
   const toneClass = {
     green: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -134,14 +166,23 @@ function Metric({
   }[tone];
 
   return (
-    <div className="border-line min-w-20 rounded-2xl border bg-background/70 px-4 py-3 backdrop-blur">
+    <Link
+      href={href}
+      aria-label={`Show ${label} users`}
+      className="border-line group min-w-20 rounded-2xl border bg-background/70 px-4 py-3 backdrop-blur transition hover:-translate-y-0.5 hover:border-foreground/30 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <div
         className={`inline-flex min-w-8 justify-center rounded-full px-2 py-0.5 text-lg font-semibold ${toneClass}`}
       >
         {value}
       </div>
-      <p className="text-soft mt-2 text-[9px] font-bold uppercase tracking-[0.2em]">{label}</p>
-    </div>
+      <p className="text-soft mt-2 flex items-center justify-between gap-2 text-[9px] font-bold uppercase tracking-[0.2em]">
+        <span>{label}</span>
+        <span aria-hidden="true" className="text-sm transition group-hover:translate-x-0.5">
+          →
+        </span>
+      </p>
+    </Link>
   );
 }
 

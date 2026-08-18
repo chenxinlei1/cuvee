@@ -30,6 +30,8 @@ jobs:
       CUVEE_SEED_DEMO_USERS: "false"
     steps:
       - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/cuvee
       - uses: pnpm/action-setup@v4
         with: { version: 10.28.0 }
       - uses: actions/setup-node@v4

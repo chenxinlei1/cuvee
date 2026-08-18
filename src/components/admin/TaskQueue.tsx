@@ -24,7 +24,10 @@ export interface TaskRow {
 const STATUS_META: Record<TaskStatus, { label: string; badge: string }> = {
   pending: { label: "Queued", badge: "bg-amber-500/10 text-amber-700 dark:text-amber-300" },
   running: { label: "Running", badge: "bg-sky-500/10 text-sky-700 dark:text-sky-300" },
-  completed: { label: "Completed", badge: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
+  completed: {
+    label: "Completed",
+    badge: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  },
   failed: { label: "Failed", badge: "bg-red-500/10 text-red-700 dark:text-red-300" },
   cancelled: { label: "Cancelled", badge: "bg-surface-3 text-foreground" },
 };
@@ -52,6 +55,7 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
   const [filter, setFilter] = useState<"all" | TaskStatus>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
 
   const refresh = useCallback(async () => {
     const response = await fetch("/api/admin/tasks", { cache: "no-store" });
@@ -67,16 +71,31 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
 
   async function act(id: string, action: "cancel" | "retry") {
     setMessage(null);
-    const response = await fetch(
-      `/api/admin/tasks/${id}${action === "retry" ? "/retry" : ""}`,
-      { method: action === "cancel" ? "DELETE" : "POST" },
-    );
+    const response = await fetch(`/api/admin/tasks/${id}`, {
+      method: action === "cancel" ? "DELETE" : "POST",
+    });
     const data = (await response.json().catch(() => ({}))) as { error?: string };
     if (!response.ok) {
       setMessage(data.error ?? "Action failed");
       return;
     }
     await refresh();
+  }
+
+  async function seedDemoTasks() {
+    setMessage(null);
+    setSeeding(true);
+    try {
+      const response = await fetch("/api/admin/tasks", { method: "POST" });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        setMessage(data.error ?? "Could not create demo tasks");
+        return;
+      }
+      await refresh();
+    } finally {
+      setSeeding(false);
+    }
   }
 
   const counts = useMemo(() => {
@@ -100,7 +119,16 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
               Auto-refreshes every 5s · queued tasks can be cancelled, failed tasks retried
             </p>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {process.env.NODE_ENV === "development" ? (
+              <button
+                onClick={() => void seedDemoTasks()}
+                disabled={seeding}
+                className="chip disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {seeding ? "Creating..." : "+ Demo tasks"}
+              </button>
+            ) : null}
             {FILTERS.map((key) => (
               <button
                 key={key}
@@ -115,7 +143,9 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
       </div>
 
       {message ? (
-        <p className="border-line border-b bg-red-500/5 px-6 py-3 text-sm text-red-600">{message}</p>
+        <p className="border-line border-b bg-red-500/5 px-6 py-3 text-sm text-red-600">
+          {message}
+        </p>
       ) : null}
 
       {visible.length === 0 ? (
@@ -138,18 +168,21 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
                 const meta = STATUS_META[task.status];
                 const canCancel = task.status === "pending";
                 const canRetry = task.status === "failed";
-                const showError = task.error && (expanded === task.id || (task.error?.length ?? 0) <= 90);
+                const showError =
+                  task.error && (expanded === task.id || (task.error?.length ?? 0) <= 90);
                 return (
                   <tr key={task.id} className="hover:bg-surface-1/60">
                     <td className="px-6 py-3 align-top">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${meta.badge}`}>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${meta.badge}`}
+                      >
                         {meta.label}
                       </span>
                       {task.status === "running" ? (
                         <div className="mt-2 w-28">
                           <div className="bg-surface-3 h-1.5 overflow-hidden rounded-full">
                             <div
-                              className="bg-sky-500 h-full rounded-full transition-all"
+                              className="h-full rounded-full bg-sky-500 transition-all"
                               style={{ width: `${Math.max(task.progress, 4)}%` }}
                             />
                           </div>
@@ -207,10 +240,7 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
                         </button>
                       ) : null}
                       {canRetry ? (
-                        <button
-                          onClick={() => void act(task.id, "retry")}
-                          className="chip"
-                        >
+                        <button onClick={() => void act(task.id, "retry")} className="chip">
                           Retry
                         </button>
                       ) : null}

@@ -38,9 +38,7 @@ const serverSchema = z.object({
   // ─── retrieval (public-web grounding) ──────────────────────────────────
   /** Optional explicit override. When unset, defaultRetrieval() prefers the
    *  first configured provider in this order: tavily, searxng, brave, null. */
-  CUVEE_RETRIEVAL_PROVIDER: z
-    .enum(["tavily", "brave", "searxng", "null"])
-    .optional(),
+  CUVEE_RETRIEVAL_PROVIDER: z.enum(["tavily", "brave", "searxng", "null"]).optional(),
 
   // Tavily — managed API, paid plans (free tier ~1k/mo).
   TAVILY_API_KEY: z.string().min(1).optional(),
@@ -72,6 +70,12 @@ const serverSchema = z.object({
     .union([z.literal("true"), z.literal("false"), z.literal("")])
     .optional()
     .transform((v) => v !== "false"),
+  /** Start the queue dispatcher during Node server boot. Used by dedicated
+   *  Kubernetes worker pods, which run the same image without receiving HTTP traffic. */
+  CUVEE_WORKER_AUTOSTART: z
+    .union([z.literal("true"), z.literal("false"), z.literal("")])
+    .optional()
+    .transform((v) => v === "true"),
   /** Maximum number of analyses executed concurrently by the worker. */
   CUVEE_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
   /** How often the worker polls the task table (ms). */
@@ -79,7 +83,11 @@ const serverSchema = z.object({
   /** Heartbeat age after which a running task is considered crashed and re-claimed (ms). */
   CUVEE_WORKER_STALE_MS: z.coerce.number().int().min(5_000).max(3_600_000).default(60_000),
   /** Finished/pending tasks are deleted after this TTL (ms). */
-  CUVEE_TASK_TTL_MS: z.coerce.number().int().min(60_000).default(24 * 60 * 60_000),
+  CUVEE_TASK_TTL_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .default(24 * 60 * 60_000),
 });
 
 const publicSchema = z.object({
@@ -110,9 +118,7 @@ function parseEnv() {
   // Empty-string env vars (common when a placeholder line like `KEY=` is
   // left in .env.local) should be treated as unset, not as values that
   // fail .min(1). Filter them out before validation.
-  const cleanedEnv = Object.fromEntries(
-    Object.entries(process.env).filter(([, v]) => v !== ""),
-  );
+  const cleanedEnv = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
   const server = serverSchema.safeParse(cleanedEnv);
   if (!server.success) {
     console.error("❌ Invalid server env:", server.error.flatten().fieldErrors);

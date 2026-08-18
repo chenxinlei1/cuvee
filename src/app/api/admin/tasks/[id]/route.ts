@@ -6,6 +6,7 @@ import { cancelPendingTask, retryTask } from "@/lib/tasks/store";
 import { ensureWorkerStarted } from "@/lib/tasks/worker";
 import { increment } from "@/lib/observability/metrics";
 import { log } from "@/lib/observability/logger";
+import { isSameOrigin } from "@/lib/auth/request-security";
 
 export const runtime = "nodejs";
 
@@ -17,18 +18,14 @@ async function actor() {
 }
 
 /** Cancel a queued task. */
-export async function DELETE(
-  _: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameOrigin(request))
+    return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   const user = await actor();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
   if (!(await cancelPendingTask(id)))
-    return NextResponse.json(
-      { error: "Only queued tasks can be cancelled" },
-      { status: 409 },
-    );
+    return NextResponse.json({ error: "Only queued tasks can be cancelled" }, { status: 409 });
   await writeAuditLog(user.id, "analysis.cancel", "analysis", id);
   increment("cuvee_tasks_cancelled_total", "Analysis tasks cancelled");
   log("info", "analysis.cancelled", { taskId: id, userId: user.id });
@@ -36,10 +33,9 @@ export async function DELETE(
 }
 
 /** Re-queue a failed task. */
-export async function POST(
-  _: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameOrigin(request))
+    return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   const user = await actor();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;

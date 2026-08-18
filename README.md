@@ -99,6 +99,7 @@ connection string and the TLS settings required by the provider.
 | `CUVEE_MEMORY_FEW_SHOT_LIMIT` | Number of past predictions injected into the extraction prompt as calibration anchors | `3` |
 | `CUVEE_DATA_DIR` | Runtime data root — SQLite state, bundled datasets, pre-hydrated cache export. The Docker image mounts a persistent volume here. | `data/` |
 | `CUVEE_WORKER_ENABLED` | Run the in-process analysis worker. Set `false` to offload execution to a dedicated worker. | `true` |
+| `CUVEE_WORKER_AUTOSTART` | Start the worker when the Node server boots. Used by dedicated Kubernetes worker Pods. | `false` |
 | `CUVEE_WORKER_CONCURRENCY` | Max parallel analyses executed by the worker | `2` |
 | `CUVEE_WORKER_POLL_MS` / `CUVEE_WORKER_STALE_MS` | Queue poll interval / heartbeat staleness for crash re-claim | `1500` / `60000` |
 | `CUVEE_TASK_TTL_MS` | Finished/pending tasks are deleted after this TTL | `24h` |
@@ -172,6 +173,18 @@ Configure `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` to enable server and browser
 without them, Sentry remains disabled. Logs are emitted as structured JSON with passwords, tokens,
 cookies, and API keys redacted before writing; process gauges (uptime, heap, RSS) are exported
 alongside the application counters. CI uploads source maps when `SENTRY_AUTH_TOKEN` is configured.
+
+#### Kubernetes
+
+A production-oriented Helm chart is available at
+[`deploy/helm/cuvee`](deploy/helm/cuvee). It runs separate, independently
+scalable web and PostgreSQL-backed worker Deployments, with health probes,
+rolling updates, an external Secret, optional Ingress/TLS, autoscaling, and
+persistent storage. PostgreSQL remains external to the chart.
+
+See [`deploy/helm/cuvee/README.md`](deploy/helm/cuvee/README.md) for image
+publishing, private GHCR access, database migration, installation, verification,
+and storage constraints.
 
 #### Observability stack (Loki + Grafana)
 

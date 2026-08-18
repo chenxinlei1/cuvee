@@ -1,10 +1,18 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { AuthUser, OrganizationType, Role } from "@/lib/auth/types";
 import { ROLE_LABELS } from "@/lib/auth/types";
 
 type ManagedUser = AuthUser & { status: string; createdAt: number };
+export type UserFilter = "all" | "active" | "pending" | "platformAdmin";
+
+const USER_FILTERS: Array<{ value: UserFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "pending", label: "Pending" },
+  { value: "platformAdmin", label: "Platform admin" },
+];
 
 const ORGS: Array<{ value: OrganizationType; label: string }> = [
   { value: "chateau", label: "Château" },
@@ -16,15 +24,41 @@ const ORGS: Array<{ value: OrganizationType; label: string }> = [
 export function UserManager({
   initialUsers,
   currentUserId,
+  initialFilter = "all",
 }: {
   initialUsers: ManagedUser[];
   currentUserId: string;
+  initialFilter?: UserFilter;
 }) {
   const [users, setUsers] = useState(initialUsers);
+  const [filter, setFilter] = useState<UserFilter>(initialFilter);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+
+  useEffect(() => setFilter(initialFilter), [initialFilter]);
+
+  const filteredUsers = useMemo(
+    () =>
+      users.filter((user) => {
+        if (filter === "active") return user.status === "active";
+        if (filter === "pending") return user.status === "pending";
+        if (filter === "platformAdmin") return user.role === "platformAdmin";
+        return true;
+      }),
+    [filter, users],
+  );
+
+  const filterCounts = useMemo(
+    () => ({
+      all: users.length,
+      active: users.filter((user) => user.status === "active").length,
+      pending: users.filter((user) => user.status === "pending").length,
+      platformAdmin: users.filter((user) => user.role === "platformAdmin").length,
+    }),
+    [users],
+  );
 
   async function refresh() {
     const response = await fetch("/api/admin/users", { cache: "no-store" });
@@ -112,23 +146,38 @@ export function UserManager({
   }
 
   return (
-    <section className="card-lg min-w-0 overflow-hidden">
-      <div className="border-line flex items-center justify-between gap-4 border-b px-5 py-4 sm:px-6">
+    <section id="users" className="card-lg min-w-0 scroll-mt-20 overflow-hidden">
+      <div className="border-line flex flex-wrap items-center justify-between gap-4 border-b px-5 py-4 sm:px-6">
         <div>
           <p className="kicker">Workspace directory</p>
           <h2 className="mt-1 text-lg font-semibold">
-            Users <span className="text-soft font-normal">· {users.length}</span>
+            Users <span className="text-soft font-normal">· {filteredUsers.length}</span>
           </h2>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowCreate((value) => !value)}
-          aria-expanded={showCreate}
-          className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-xs font-bold text-background transition hover:opacity-80"
-        >
-          <span className="text-base leading-none">{showCreate ? "×" : "+"}</span>
-          {showCreate ? "Close" : "Add user"}
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap gap-1" aria-label="Filter users">
+            {USER_FILTERS.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setFilter(item.value)}
+                aria-pressed={filter === item.value}
+                className={`chip ${filter === item.value ? "bg-foreground text-background" : ""}`}
+              >
+                {item.label} · {filterCounts[item.value]}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowCreate((value) => !value)}
+            aria-expanded={showCreate}
+            className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-xs font-bold text-background transition hover:opacity-80"
+          >
+            <span className="text-base leading-none">{showCreate ? "×" : "+"}</span>
+            {showCreate ? "Close" : "Add user"}
+          </button>
+        </div>
       </div>
 
       {showCreate ? (
@@ -215,7 +264,7 @@ export function UserManager({
       ) : null}
 
       <div className="divide-line divide-y">
-        {users.map((item) => {
+        {filteredUsers.map((item) => {
           const isCurrentUser = item.id === currentUserId;
           return (
             <article
@@ -341,6 +390,11 @@ export function UserManager({
             </article>
           );
         })}
+        {filteredUsers.length === 0 ? (
+          <p className="text-soft px-6 py-12 text-center text-sm">
+            No users match this filter.
+          </p>
+        ) : null}
       </div>
     </section>
   );

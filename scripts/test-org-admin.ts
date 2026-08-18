@@ -6,6 +6,7 @@ import {
   authenticate,
   closeDatabase,
   consumeSetupToken,
+  createUser,
   findUserById,
   userStatusByEmail,
 } from "../src/lib/auth/db";
@@ -70,6 +71,25 @@ async function main() {
     );
     const platform = await findUserById(adminId);
     assert(platform && hasPermission(platform, "user:manage"), "platform admin must load");
+
+    // Self-registration creates a pending user, but must still return the
+    // created identity so the route can issue an email-verification token.
+    const registrationOrg = `Registration Org ${randomUUID().slice(0, 8)}`;
+    const registered = await createUser({
+      email: `registration-${randomUUID().slice(0, 8)}@test.local`,
+      name: "Pending Registration",
+      password: "registration-password",
+      role: "buyerStaff",
+      status: "pending",
+      organizationType: "buyer",
+      organizationName: registrationOrg,
+      emailVerified: false,
+    });
+    userIds.push(registered.id);
+    if (registered.organizationId) orgIds.push(registered.organizationId);
+    assert.equal(registered.status, "pending");
+    assert.equal(await userStatusByEmail(registered.email), "pending");
+    assert.equal(await findUserById(registered.id), null, "pending user must not authenticate");
 
     // ── scoping: org admins see only their own organization ───────────────
     const wineryOrgs = await listOrganizationsFor(winery);
