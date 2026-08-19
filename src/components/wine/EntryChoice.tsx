@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useT } from "@/lib/i18n/Provider";
 
-export function EntryChoice() {
+export function EntryChoice({
+  entries,
+}: {
+  entries: Array<"vineyard" | "trade" | "provenance">;
+}) {
   const t = useT();
   return (
     <main className="container mx-auto max-w-5xl px-6 py-24 md:py-32">
@@ -15,21 +19,34 @@ export function EntryChoice() {
         <p className="kicker mt-10">— {t("landing.choose_entry")} —</p>
       </header>
 
-      <div className="grid gap-px overflow-hidden rounded-card border border-line bg-line md:grid-cols-2">
-        <EntryCard
-          href="/vineyard"
-          index="01"
-          title={t("landing.vineyard.title")}
-          subtitle={t("landing.vineyard.subtitle")}
-          cta={t("landing.vineyard.cta")}
-        />
-        <EntryCard
-          href="/trade"
-          index="02"
-          title={t("landing.trade.title")}
-          subtitle={t("landing.trade.subtitle")}
-          cta={t("landing.trade.cta")}
-        />
+      <div className="grid gap-px overflow-hidden rounded-card border border-line bg-line md:grid-cols-3">
+        {entries.includes("vineyard") ? (
+          <EntryCard
+            href="/vineyard"
+            index="01"
+            title={t("landing.vineyard.title")}
+            subtitle={t("landing.vineyard.subtitle")}
+            cta={t("landing.vineyard.cta")}
+          />
+        ) : null}
+        {entries.includes("trade") ? (
+          <EntryCard
+            href="/trade"
+            index="02"
+            title={t("landing.trade.title")}
+            subtitle={t("landing.trade.subtitle")}
+            cta={t("landing.trade.cta")}
+          />
+        ) : null}
+        {entries.includes("provenance") ? (
+          <EntryCard
+            href="/provenance"
+            index="03"
+            title={t("landing.provenance.title")}
+            subtitle={t("landing.provenance.subtitle")}
+            cta={t("landing.provenance.cta")}
+          />
+        ) : null}
       </div>
     </main>
   );

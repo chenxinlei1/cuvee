@@ -40,11 +40,18 @@ export function hasPermission(user: AuthUser, permission: Permission): boolean {
 }
 
 export function canAccessVineyard(user: AuthUser): boolean {
-  return hasPermission(user, "analysis:run") && hasPermission(user, "workspace:vineyard");
+  if (hasPermission(user, "user:manage")) return true;
+  const winerySide = user.role === "wineryAdmin" || user.role === "wineryStaff" || user.organizationType === "chateau";
+  return winerySide && hasPermission(user, "analysis:run") && hasPermission(user, "workspace:vineyard");
 }
 
 export function canAccessTrade(user: AuthUser): boolean {
-  return hasPermission(user, "analysis:run") && hasPermission(user, "workspace:trade");
+  if (hasPermission(user, "user:manage")) return true;
+  const tradeSide =
+    user.role === "buyerAdmin" ||
+    user.role === "buyerStaff" ||
+    ["negociant", "distributor", "buyer"].includes(user.organizationType ?? "");
+  return tradeSide && hasPermission(user, "analysis:run") && hasPermission(user, "workspace:trade");
 }
 
 export function canManageReport(user: AuthUser, ownerId: string, organizationId?: string): boolean {

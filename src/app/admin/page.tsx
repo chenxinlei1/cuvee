@@ -2,7 +2,12 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth/session";
 import { hasPermission, ROLE_LABELS } from "@/lib/auth/types";
-import { listAccessRoles, listAuditLogs, listPermissionDefinitions, listUsers } from "@/lib/auth/db";
+import {
+  listAccessRoles,
+  listAuditLogs,
+  listPermissionDefinitions,
+  listUsers,
+} from "@/lib/auth/db";
 import { listTasksForAdmin } from "@/lib/tasks/store";
 import { UserManager } from "@/components/admin/UserManager";
 import type { UserFilter } from "@/components/admin/UserManager";
@@ -12,12 +17,12 @@ import { TaskQueue } from "@/components/admin/TaskQueue";
 export const dynamic = "force-dynamic";
 
 const ACTION_LABELS: Record<string, string> = {
-  "auth.login": "User signed in",
-  "auth.logout": "User signed out",
-  "auth.login_failed": "Failed sign-in attempt",
-  "auth.register": "Account requested",
-  "user.created": "User created",
-  "user.updated": "User updated",
+  "auth.login": "用户已登录",
+  "auth.logout": "用户已退出",
+  "auth.login_failed": "登录尝试失败",
+  "auth.register": "账户申请已提交",
+  "user.created": "用户已创建",
+  "user.updated": "用户已更新",
 };
 
 function actionLabel(action: string) {
@@ -51,32 +56,28 @@ export default async function AdminPage({
     : "all";
 
   return (
-    <main className="container mx-auto max-w-7xl px-5 py-8 sm:px-7 lg:py-10">
-      <header className="border-line bg-surface-1 relative overflow-hidden rounded-[2rem] border px-6 py-7 sm:px-9 sm:py-9">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-accent/10 blur-3xl"
-        />
-        <div className="relative flex flex-col justify-between gap-7 lg:flex-row lg:items-end">
+    <main className="container mx-auto max-w-[1440px] px-5 py-8 sm:px-7 lg:py-10">
+      <header className="border-line border-b pb-7">
+        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div>
-            <p className="kicker">AOS management · Platform administration</p>
-            <h1 className="mt-3 max-w-3xl font-serif text-4xl font-medium leading-none sm:text-5xl">
-              Access control
+            <p className="kicker">平台管理</p>
+            <h1 className="mt-3 max-w-3xl font-serif text-4xl font-medium leading-none">
+              访问与权限控制
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Manage workspace access, organization roles, and security activity from one place.
+              集中管理工作区访问、组织角色与安全活动。
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-6 lg:justify-end">
             <Metric
               value={activeUsers}
-              label="Active"
+              label="活跃用户"
               tone="green"
               href="/admin?users=active#users"
             />
             <Metric
               value={pendingUsers}
-              label="Pending"
+              label="待审核"
               tone="amber"
               href="/admin?users=pending#users"
             />
@@ -90,60 +91,65 @@ export default async function AdminPage({
         </div>
       </header>
 
-      <div className="mt-4 flex justify-end">
-        <Link href="/admin/organizations" className="chip">
-          Organizations
+      <div className="border-line flex justify-end border-b py-3">
+        <Link
+          href="/admin/organizations"
+          className="text-soft text-xs font-semibold transition-colors hover:text-foreground"
+        >
+          组织管理
         </Link>
       </div>
 
-      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <UserManager
-          initialUsers={users}
-          currentUserId={user.id}
-          initialFilter={userFilter}
-        />
+      <div className="grid items-start xl:grid-cols-[minmax(0,1fr)_320px]">
+        <UserManager initialUsers={users} currentUserId={user.id} initialFilter={userFilter} />
 
-        <aside className="card-lg overflow-hidden xl:sticky xl:top-20">
-          <div className="border-line flex items-center justify-between border-b px-5 py-4">
-            <div>
-              <p className="kicker">Security activity</p>
-              <h2 className="mt-1 text-base font-semibold">Recent audit trail</h2>
-            </div>
-            <span className="bg-surface-2 grid h-9 w-9 place-items-center rounded-full text-muted-foreground">
-              <AuditIcon />
-            </span>
-          </div>
-          <ol className="divide-line divide-y px-5">
-            {logs.length ? (
-              logs.slice(0, 10).map((log, index) => (
-                <li key={log.id} className="relative py-4 pl-6">
-                  <span
-                    className={`absolute left-0 top-[1.35rem] h-2.5 w-2.5 rounded-full ring-4 ring-background ${
-                      log.action.includes("failed") ? "bg-destructive" : "bg-accent"
-                    }`}
-                  />
-                  {index < Math.min(logs.length, 10) - 1 ? (
-                    <span className="bg-line absolute bottom-0 left-[4px] top-8 w-px" />
-                  ) : null}
-                  <p className="text-sm font-semibold capitalize">{actionLabel(log.action)}</p>
-                  <p className="text-soft mt-1 text-xs">
-                    {new Date(log.createdAt).toLocaleString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </li>
-              ))
-            ) : (
-              <li className="text-soft py-10 text-center text-sm">No activity recorded yet.</li>
-            )}
-          </ol>
+        <aside className="border-line overflow-hidden border-t xl:sticky xl:top-20 xl:border-l xl:border-t-0">
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 [&::-webkit-details-marker]:hidden">
+              <div>
+                <p className="kicker">安全活动</p>
+                <h2 className="mt-1 text-base font-semibold">
+                  最近审计记录 <span className="text-soft font-normal">· {logs.length}</span>
+                </h2>
+              </div>
+              <span className="grid h-8 w-8 place-items-center text-muted-foreground transition-transform group-open:rotate-180">
+                <ChevronIcon />
+              </span>
+            </summary>
+            <ol className="divide-line border-line divide-y border-t px-5">
+              {logs.length ? (
+                logs.slice(0, 10).map((log, index) => (
+                  <li key={log.id} className="relative py-4 pl-6">
+                    <span
+                      className={`absolute left-0 top-[1.35rem] h-2.5 w-2.5 rounded-full ring-4 ring-background ${
+                        log.action.includes("failed") ? "bg-destructive" : "bg-accent"
+                      }`}
+                    />
+                    {index < Math.min(logs.length, 10) - 1 ? (
+                      <span className="bg-line absolute bottom-0 left-[4px] top-8 w-px" />
+                    ) : null}
+                    <p className="text-sm font-semibold capitalize">{actionLabel(log.action)}</p>
+                    <p className="text-soft mt-1 text-xs">
+                      {new Date(log.createdAt).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </li>
+                ))
+              ) : (
+                <li className="text-soft py-10 text-center text-sm">暂无活动记录。</li>
+              )}
+            </ol>
+          </details>
         </aside>
       </div>
-      {hasPermission(user,"role:manage")?<RoleManager initialRoles={roles} permissionDefinitions={permissions}/>:null}
-      {hasPermission(user,"report:read:any")?<TaskQueue initialTasks={tasks}/>:null}
+      {hasPermission(user, "role:manage") ? (
+        <RoleManager initialRoles={roles} permissionDefinitions={permissions} />
+      ) : null}
+      {hasPermission(user, "report:read:any") ? <TaskQueue initialTasks={tasks} /> : null}
     </main>
   );
 }
@@ -160,23 +166,19 @@ function Metric({
   href: string;
 }) {
   const toneClass = {
-    green: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-    amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-    neutral: "bg-surface-3 text-foreground",
+    green: "text-emerald-700 dark:text-emerald-300",
+    amber: "text-amber-700 dark:text-amber-300",
+    neutral: "text-foreground",
   }[tone];
 
   return (
     <Link
       href={href}
       aria-label={`Show ${label} users`}
-      className="border-line group min-w-20 rounded-2xl border bg-background/70 px-4 py-3 backdrop-blur transition hover:-translate-y-0.5 hover:border-foreground/30 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="border-line group min-w-20 border-l pl-4 transition hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div
-        className={`inline-flex min-w-8 justify-center rounded-full px-2 py-0.5 text-lg font-semibold ${toneClass}`}
-      >
-        {value}
-      </div>
-      <p className="text-soft mt-2 flex items-center justify-between gap-2 text-[9px] font-bold uppercase tracking-[0.2em]">
+      <div className={`text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</div>
+      <p className="text-soft mt-1 flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.16em]">
         <span>{label}</span>
         <span aria-hidden="true" className="text-sm transition group-hover:translate-x-0.5">
           →
@@ -186,11 +188,10 @@ function Metric({
   );
 }
 
-function AuditIcon() {
+function ChevronIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-      <path d="M12 3l7 3v5c0 4.7-2.9 8.1-7 10-4.1-1.9-7-5.3-7-10V6l7-3z" />
-      <path d="M9 12l2 2 4-4" />
+      <path d="m6 9 6 6 6-6" />
     </svg>
   );
 }

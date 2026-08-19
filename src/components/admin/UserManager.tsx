@@ -8,17 +8,17 @@ type ManagedUser = AuthUser & { status: string; createdAt: number };
 export type UserFilter = "all" | "active" | "pending" | "platformAdmin";
 
 const USER_FILTERS: Array<{ value: UserFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "active", label: "Active" },
-  { value: "pending", label: "Pending" },
-  { value: "platformAdmin", label: "Platform admin" },
+  { value: "all", label: "全部" },
+  { value: "active", label: "活跃" },
+  { value: "pending", label: "待审核" },
+  { value: "platformAdmin", label: "平台管理员" },
 ];
 
 const ORGS: Array<{ value: OrganizationType; label: string }> = [
-  { value: "chateau", label: "Château" },
-  { value: "negociant", label: "Négociant" },
-  { value: "distributor", label: "Distributor" },
-  { value: "buyer", label: "Buyer" },
+  { value: "chateau", label: "酒庄" },
+  { value: "negociant", label: "酒商" },
+  { value: "distributor", label: "经销商" },
+  { value: "buyer", label: "采购方" },
 ];
 
 export function UserManager({
@@ -85,7 +85,7 @@ export function UserManager({
     });
     const data = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(data.error ?? "Update failed");
+      setError(data.error ?? "更新失败");
       return;
     }
     await refresh();
@@ -109,7 +109,7 @@ export function UserManager({
     const response = await fetch(`/api/admin/users/${item.id}`, { method: "DELETE" });
     const data = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(data.error ?? "Delete failed");
+      setError(data.error ?? "删除失败");
       return;
     }
     setResettingUserId(null);
@@ -137,7 +137,7 @@ export function UserManager({
     const data = (await response.json()) as { error?: string };
     setCreating(false);
     if (!response.ok) {
-      setError(data.error ?? "Create failed");
+      setError(data.error ?? "创建失败");
       return;
     }
     element.reset();
@@ -146,16 +146,26 @@ export function UserManager({
   }
 
   return (
-    <section id="users" className="card-lg min-w-0 scroll-mt-20 overflow-hidden">
-      <div className="border-line flex flex-wrap items-center justify-between gap-4 border-b px-5 py-4 sm:px-6">
+    <details id="users" open className="group min-w-0 scroll-mt-20 overflow-hidden">
+      <summary className="border-line flex cursor-pointer list-none items-center justify-between border-b px-5 py-4 sm:px-6 [&::-webkit-details-marker]:hidden">
         <div>
-          <p className="kicker">Workspace directory</p>
+          <p className="kicker">工作区成员</p>
           <h2 className="mt-1 text-lg font-semibold">
-            Users <span className="text-soft font-normal">· {filteredUsers.length}</span>
+            用户 <span className="text-soft font-normal">· {filteredUsers.length}</span>
           </h2>
         </div>
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden
+          className="text-soft h-4 w-4 shrink-0 fill-none stroke-current transition-transform group-open:rotate-180"
+          strokeWidth="1.8"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </summary>
+      <div className="border-line flex flex-wrap items-center justify-end gap-2 border-b px-5 py-3 sm:px-6">
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="flex flex-wrap gap-1" aria-label="Filter users">
+          <div className="flex flex-wrap gap-1" aria-label="筛选用户">
             {USER_FILTERS.map((item) => (
               <button
                 key={item.value}
@@ -172,10 +182,10 @@ export function UserManager({
             type="button"
             onClick={() => setShowCreate((value) => !value)}
             aria-expanded={showCreate}
-            className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-xs font-bold text-background transition hover:opacity-80"
+            className="inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-2 text-xs font-bold text-background transition hover:opacity-80"
           >
             <span className="text-base leading-none">{showCreate ? "×" : "+"}</span>
-            {showCreate ? "Close" : "Add user"}
+            {showCreate ? "关闭" : "添加用户"}
           </button>
         </div>
       </div>
@@ -183,13 +193,11 @@ export function UserManager({
       {showCreate ? (
         <form onSubmit={create} className="border-line bg-surface-1 border-b p-5 sm:p-6">
           <div className="mb-4">
-            <p className="text-sm font-semibold">Create workspace user</p>
-            <p className="text-soft mt-1 text-xs">
-              Assign an initial role and organization. The password can be changed later.
-            </p>
+            <p className="text-sm font-semibold">创建工作区用户</p>
+            <p className="text-soft mt-1 text-xs">为用户分配初始角色和组织，密码可稍后修改。</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <Field label="Full name">
+            <Field label="姓名">
               <input
                 required
                 name="name"
@@ -197,7 +205,7 @@ export function UserManager({
                 className="admin-input"
               />
             </Field>
-            <Field label="Work email">
+            <Field label="工作邮箱">
               <input
                 required
                 name="email"
@@ -206,7 +214,7 @@ export function UserManager({
                 className="admin-input"
               />
             </Field>
-            <Field label="Temporary password">
+            <Field label="临时密码">
               <input
                 required
                 name="password"
@@ -216,7 +224,7 @@ export function UserManager({
                 className="admin-input"
               />
             </Field>
-            <Field label="Organization type">
+            <Field label="组织类型">
               <select name="organizationType" className="admin-input">
                 {ORGS.map((org) => (
                   <option key={org.value} value={org.value}>
@@ -225,15 +233,15 @@ export function UserManager({
                 ))}
               </select>
             </Field>
-            <Field label="Organization">
+            <Field label="组织">
               <input
                 required
                 name="organizationName"
-                placeholder="Organization name"
+                placeholder="组织名称"
                 className="admin-input"
               />
             </Field>
-            <Field label="Access role">
+            <Field label="访问角色">
               <select name="role" className="admin-input">
                 <option value="buyerStaff">{ROLE_LABELS.buyerStaff}</option>
                 <option value="buyerAdmin">{ROLE_LABELS.buyerAdmin}</option>
@@ -248,7 +256,7 @@ export function UserManager({
               disabled={creating}
               className="rounded-full bg-foreground px-5 py-2.5 text-sm font-bold text-background transition hover:opacity-80 disabled:cursor-wait disabled:opacity-50"
             >
-              {creating ? "Creating…" : "Create user"}
+              {creating ? "正在创建…" : "创建用户"}
             </button>
           </div>
         </form>
@@ -280,7 +288,7 @@ export function UserManager({
                     <h3 className="truncate text-sm font-semibold">{item.name}</h3>
                     {isCurrentUser ? (
                       <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-foreground">
-                        You
+                        当前账户
                       </span>
                     ) : null}
                   </div>
@@ -306,7 +314,7 @@ export function UserManager({
                   ))}
                 </select>
                 <p className="text-soft mt-1.5 truncate text-xs">
-                  {item.organizationName ?? "Organization not set"}
+                  {item.organizationName ?? "未设置组织"}
                 </p>
               </div>
 
@@ -328,7 +336,7 @@ export function UserManager({
                 <StatusBadge status={item.status} />
                 {isCurrentUser ? (
                   <span className="text-soft text-[10px] font-bold uppercase tracking-wider">
-                    Protected
+                    受保护
                   </span>
                 ) : (
                   <button
@@ -341,10 +349,10 @@ export function UserManager({
                     className="decoration-line-strong text-xs font-semibold underline underline-offset-4 transition hover:text-accent"
                   >
                     {item.status === "pending"
-                      ? "Approve"
+                      ? "批准"
                       : item.status === "active"
-                        ? "Disable"
-                        : "Enable"}
+                        ? "停用"
+                        : "启用"}
                   </button>
                 )}
                 {!isCurrentUser ? (
@@ -355,7 +363,7 @@ export function UserManager({
                     }
                     className="decoration-line-strong text-xs font-semibold underline underline-offset-4 transition hover:text-accent"
                   >
-                    Reset password
+                    重置密码
                   </button>
                 ) : null}
                 {!isCurrentUser ? (
@@ -364,7 +372,7 @@ export function UserManager({
                     onClick={() => void removeUser(item)}
                     className="text-xs font-semibold text-red-500 underline underline-offset-4 transition hover:text-red-400"
                   >
-                    Delete
+                    删除
                   </button>
                 ) : null}
               </div>
@@ -379,11 +387,11 @@ export function UserManager({
                     type="password"
                     minLength={12}
                     autoComplete="new-password"
-                    placeholder="Temporary password · 12+ characters"
+                    placeholder="临时密码 · 至少 12 个字符"
                     className="admin-input max-w-sm"
                   />
                   <button className="rounded-full bg-foreground px-4 py-2 text-xs font-bold text-background">
-                    Save password
+                    保存密码
                   </button>
                 </form>
               ) : null}
@@ -391,12 +399,10 @@ export function UserManager({
           );
         })}
         {filteredUsers.length === 0 ? (
-          <p className="text-soft px-6 py-12 text-center text-sm">
-            No users match this filter.
-          </p>
+          <p className="text-soft px-6 py-12 text-center text-sm">没有符合筛选条件的用户。</p>
         ) : null}
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -424,7 +430,7 @@ function StatusBadge({ status }: { status: string }) {
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.15em] ${className}`}
     >
       <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {status}
+      {{ active: "活跃", pending: "待审核", disabled: "已停用" }[status] ?? status}
     </span>
   );
 }

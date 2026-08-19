@@ -44,8 +44,10 @@ const config: NextConfig = {
   },
 };
 
-export default withSentryConfig(config, {
-  silent: true,
-  webpack: { treeshake: { removeDebugLogging: true } },
-  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
-});
+export default process.env.NODE_ENV === "development"
+  ? config
+  : withSentryConfig(config, {
+      silent: true,
+      webpack: { treeshake: { removeDebugLogging: true } },
+      sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+    });

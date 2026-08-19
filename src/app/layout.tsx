@@ -24,14 +24,13 @@ const THEME_BOOT_SCRIPT = `
 `;
 
 export const metadata: Metadata = {
-  title: "Cuvée — Vintage intelligence for French wine regions",
-  description:
-    "Schema-grounded, multi-agent vintage-quality scoring for Burgundy + Bordeaux, with critic-backed backtest verification.",
+  title: "Cuvée — 葡萄酒情报平台",
+  description: "面向勃艮第、波尔多与酒源溯源的多智能体分析平台。",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="zh-CN" className="dark" suppressHydrationWarning>
       <head>
         <Script
           id="theme-boot"
@@ -52,8 +51,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 function TopNav() {
   return (
     <nav className="glass sticky top-0 z-40 print:hidden">
-      <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-7">
-        <Link href="/" aria-label="Cuvée" className="group inline-flex items-center gap-3">
+      <div className="mx-auto flex min-h-16 max-w-[1540px] items-center gap-5 px-4 py-2 lg:px-7">
+        <Link href="/" aria-label="Cuvée" className="group inline-flex shrink-0 items-center gap-3">
           <span className="grid h-7 w-7 place-items-center">
             <svg
               viewBox="0 0 24 24"
@@ -72,7 +71,7 @@ function TopNav() {
           <span className="text-sm font-bold tracking-[0.04em]">Cuvée</span>
           <span className="kicker ml-1">Atlas</span>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <LocalizedNavLinks />
           <ThemeToggle />
           <LocaleSwitcher />

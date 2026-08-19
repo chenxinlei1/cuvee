@@ -41,7 +41,7 @@ export function ThemeToggle() {
       onClick={toggle}
       aria-label={nextLabel}
       title={nextLabel}
-      className="chip group inline-flex items-center gap-1.5 hover:bg-surface-2"
+      className="group inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-1 text-soft transition-colors hover:bg-surface-2 hover:text-foreground"
     >
       {theme === "dark" ? (
         // Show sun glyph to indicate the action (switch to light).
@@ -55,7 +55,7 @@ export function ThemeToggle() {
           <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />
         </svg>
       )}
-      <span className="uppercase tracking-[0.22em]">{nextLabel}</span>
+      <span className="sr-only">{nextLabel}</span>
     </button>
   );
 }

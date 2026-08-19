@@ -22,14 +22,14 @@ export interface TaskRow {
 }
 
 const STATUS_META: Record<TaskStatus, { label: string; badge: string }> = {
-  pending: { label: "Queued", badge: "bg-amber-500/10 text-amber-700 dark:text-amber-300" },
-  running: { label: "Running", badge: "bg-sky-500/10 text-sky-700 dark:text-sky-300" },
+  pending: { label: "排队中", badge: "bg-amber-500/10 text-amber-700 dark:text-amber-300" },
+  running: { label: "运行中", badge: "bg-sky-500/10 text-sky-700 dark:text-sky-300" },
   completed: {
-    label: "Completed",
+    label: "已完成",
     badge: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   },
-  failed: { label: "Failed", badge: "bg-red-500/10 text-red-700 dark:text-red-300" },
-  cancelled: { label: "Cancelled", badge: "bg-surface-3 text-foreground" },
+  failed: { label: "失败", badge: "bg-red-500/10 text-red-700 dark:text-red-300" },
+  cancelled: { label: "已取消", badge: "bg-surface-3 text-foreground" },
 };
 
 const FILTERS: Array<"all" | TaskStatus> = [
@@ -58,14 +58,21 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
   const [seeding, setSeeding] = useState(false);
 
   const refresh = useCallback(async () => {
-    const response = await fetch("/api/admin/tasks", { cache: "no-store" });
-    if (response.ok) {
-      setTasks(((await response.json()) as { tasks: TaskRow[] }).tasks);
+    try {
+      const response = await fetch("/api/admin/tasks", { cache: "no-store" });
+      if (response.ok) {
+        setTasks(((await response.json()) as { tasks: TaskRow[] }).tasks);
+      }
+    } catch {
+      // A dev-server restart can briefly interrupt polling. Keep the last data
+      // instead of escalating a transient network failure to the error overlay.
     }
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => void refresh(), 5000);
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 5000);
     return () => clearInterval(timer);
   }, [refresh]);
 
@@ -76,7 +83,7 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
     });
     const data = (await response.json().catch(() => ({}))) as { error?: string };
     if (!response.ok) {
-      setMessage(data.error ?? "Action failed");
+      setMessage(data.error ?? "操作失败");
       return;
     }
     await refresh();
@@ -89,7 +96,7 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
       const response = await fetch("/api/admin/tasks", { method: "POST" });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) {
-        setMessage(data.error ?? "Could not create demo tasks");
+        setMessage(data.error ?? "无法创建演示任务");
         return;
       }
       await refresh();
@@ -109,16 +116,29 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
   const visible = filter === "all" ? tasks : tasks.filter((t) => t.status === filter);
 
   return (
-    <section className="card-lg mt-6 overflow-hidden">
-      <div className="border-line border-b px-6 py-5">
+    <details className="border-line group mt-8 overflow-hidden border-t">
+      <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-5 [&::-webkit-details-marker]:hidden">
+        <span>
+          <span className="kicker block">异步任务队列</span>
+          <span className="mt-1 block text-lg font-semibold">
+            分析任务 <span className="text-soft font-normal">· {tasks.length}</span>
+          </span>
+          <span className="text-soft mt-1 block text-xs">
+            每 5 秒自动刷新 · 可取消排队任务并重试失败任务
+          </span>
+        </span>
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden
+          className="text-soft h-4 w-4 shrink-0 fill-none stroke-current transition-transform group-open:rotate-180"
+          strokeWidth="1.8"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </summary>
+      <div className="border-line border-t px-6 py-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="kicker">Async task queue</p>
-            <h2 className="mt-1 text-lg font-semibold">Analysis tasks</h2>
-            <p className="text-soft mt-1 text-xs">
-              Auto-refreshes every 5s · queued tasks can be cancelled, failed tasks retried
-            </p>
-          </div>
+          <div />
           <div className="flex flex-wrap items-center gap-1.5">
             {process.env.NODE_ENV === "development" ? (
               <button
@@ -126,7 +146,7 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
                 disabled={seeding}
                 className="chip disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {seeding ? "Creating..." : "+ Demo tasks"}
+                {seeding ? "创建中…" : "+ 演示任务"}
               </button>
             ) : null}
             {FILTERS.map((key) => (
@@ -135,7 +155,7 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
                 onClick={() => setFilter(key)}
                 className={`chip ${filter === key ? "bg-foreground text-background" : ""}`}
               >
-                {STATUS_META[key as TaskStatus]?.label ?? "All"} · {counts.get(key) ?? 0}
+                {STATUS_META[key as TaskStatus]?.label ?? "全部"} · {counts.get(key) ?? 0}
               </button>
             ))}
           </div>
@@ -149,18 +169,18 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
       ) : null}
 
       {visible.length === 0 ? (
-        <p className="text-soft px-6 py-12 text-center text-sm">No tasks in this state.</p>
+        <p className="text-soft px-6 py-12 text-center text-sm">当前状态下没有任务。</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="text-soft border-line border-b text-[11px] uppercase tracking-wider">
               <tr>
-                <th className="px-6 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Request</th>
-                <th className="px-4 py-3 font-semibold">Owner</th>
-                <th className="px-4 py-3 font-semibold">Created</th>
-                <th className="px-4 py-3 font-semibold">Error</th>
-                <th className="px-6 py-3 text-right font-semibold">Actions</th>
+                <th className="px-6 py-3 font-semibold">状态</th>
+                <th className="px-4 py-3 font-semibold">请求</th>
+                <th className="px-4 py-3 font-semibold">提交人</th>
+                <th className="px-4 py-3 font-semibold">创建时间</th>
+                <th className="px-4 py-3 font-semibold">错误</th>
+                <th className="px-6 py-3 text-right font-semibold">操作</th>
               </tr>
             </thead>
             <tbody className="divide-line divide-y">
@@ -187,11 +207,11 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
                             />
                           </div>
                           <p className="text-soft mt-1 text-[10px]">
-                            {task.stage ?? "starting"} · {task.progress}%
+                            {task.stage ?? "正在启动"} · {task.progress}%
                           </p>
                         </div>
                       ) : task.status === "pending" ? (
-                        <p className="text-soft mt-1 text-[10px]">{task.stage ?? "queued"}</p>
+                        <p className="text-soft mt-1 text-[10px]">{task.stage ?? "排队中"}</p>
                       ) : null}
                     </td>
                     <td className="px-4 py-3 align-top">
@@ -222,7 +242,7 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
                               onClick={() => setExpanded(expanded === task.id ? null : task.id)}
                               className="text-soft ml-1 underline"
                             >
-                              {expanded === task.id ? "less" : "more"}
+                              {expanded === task.id ? "收起" : "更多"}
                             </button>
                           ) : null}
                         </>
@@ -236,12 +256,12 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
                           onClick={() => void act(task.id, "cancel")}
                           className="chip border-red-500/30 text-red-600 hover:bg-red-500/10"
                         >
-                          Cancel
+                          取消
                         </button>
                       ) : null}
                       {canRetry ? (
                         <button onClick={() => void act(task.id, "retry")} className="chip">
-                          Retry
+                          重试
                         </button>
                       ) : null}
                     </td>
@@ -252,6 +272,6 @@ export function TaskQueue({ initialTasks }: { initialTasks: TaskRow[] }) {
           </table>
         </div>
       )}
-    </section>
+    </details>
   );
 }

@@ -1,8 +1,8 @@
 import { BlogContent } from "@/components/blog/BlogContent";
 
 export const metadata = {
-  title: "How Cuvée works — Blog",
-  description: "Architecture, agents, and FAQ behind the Cuvée multi-agent pipeline.",
+  title: "Cuvée 如何工作 — 系统介绍",
+  description: "Cuvée 的架构、智能体与常见问题。",
 };
 
 export default function BlogPage() {

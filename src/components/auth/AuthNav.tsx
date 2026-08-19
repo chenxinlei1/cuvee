@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthUser } from "@/lib/auth/types";
-import { hasPermission, ROLE_LABELS } from "@/lib/auth/types";
+import { hasPermission } from "@/lib/auth/types";
 import { useT } from "@/lib/i18n/Provider";
 
 export function AuthNav() {
@@ -30,25 +30,30 @@ export function AuthNav() {
       </Link>
     );
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex shrink-0 items-center gap-2">
       {hasPermission(user, "user:manage") ? (
-        <Link href="/admin" className="chip">
-          Platform Admin
+        <Link href="/admin" className="whitespace-nowrap px-2 py-2 text-xs font-semibold text-soft transition-colors hover:text-foreground">
+          {t("auth.nav.platform_admin")}
         </Link>
       ) : null}
       {hasPermission(user, "user:manage:organization") && !hasPermission(user, "user:manage") ? (
-        <Link href="/admin/organizations" className="chip">
-          Org Admin
+        <Link href="/admin/organizations" className="whitespace-nowrap px-2 py-2 text-xs font-semibold text-soft transition-colors hover:text-foreground">
+          {t("auth.nav.organization_admin")}
         </Link>
       ) : null}
-      <Link href="/account/security" className="border-line hidden rounded-pill border px-3 py-2 text-xs md:inline">
-        {user.name} ·{" "}
-        <span className="text-soft uppercase">
-          {user.organizationType ?? "unassigned"} / {ROLE_LABELS[user.role]}
+      <Link href="/account/security" className="group flex items-center gap-2 rounded-lg border border-line bg-surface-1 px-2.5 py-1.5 transition-colors hover:bg-surface-2">
+        <span className="grid h-7 w-7 place-items-center rounded-md bg-foreground text-xs font-bold text-background">
+          {user.name.trim().charAt(0).toUpperCase()}
+        </span>
+        <span className="hidden min-w-0 leading-tight xl:block">
+          <span className="block max-w-32 truncate text-xs font-semibold">{user.name}</span>
+          <span className="text-soft block max-w-32 truncate text-[10px]">
+            {t(`auth.role.${user.role.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)}` as Parameters<typeof t>[0])}
+          </span>
         </span>
       </Link>
       <button
-        className="chip"
+        className="whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-semibold text-soft transition-colors hover:bg-surface-2 hover:text-foreground"
         type="button"
         onClick={async () => {
           await fetch("/api/auth/logout", { method: "POST" });
@@ -57,7 +62,7 @@ export function AuthNav() {
           router.refresh();
         }}
       >
-        Sign out
+        {t("auth.nav.sign_out")}
       </button>
     </div>
   );

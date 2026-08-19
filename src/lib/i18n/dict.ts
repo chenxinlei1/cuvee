@@ -13,7 +13,7 @@ export const LOCALES: { code: Locale; label: string; short: string }[] = [
   { code: "zh", label: "简体中文", short: "中" },
 ];
 
-export const DEFAULT_LOCALE: Locale = "en";
+export const DEFAULT_LOCALE: Locale = "zh";
 
 export const DICT = {
   // ── common ────────────────────────────────────────────────────────────
@@ -59,8 +59,20 @@ export const DICT = {
   },
   "nav.vineyard": { fr: "Domaine", en: "Vineyard" },
   "nav.trade": { fr: "Négoce", en: "Trade" },
+  "nav.provenance": { fr: "Traçabilité", en: "Provenance" },
   "nav.blog": { fr: "À propos", en: "Blog" },
   "nav.sign_in": { fr: "Connexion", en: "Sign in" },
+  "nav.reports": { fr: "Rapports", en: "Reports" },
+  "reports.page.eyebrow": { fr: "Intelligence autorisée", en: "Authorized intelligence" },
+  "reports.page.title": { fr: "Rapports", en: "Reports" },
+  "reports.page.subtitle": {
+    fr: "Voir les rapports publics et ceux qui vous ont été autorisés par un domaine, un négociant ou un partenaire logistique.",
+    en: "View public reports and reports authorized for you by a winery, merchant, or supply-chain partner.",
+  },
+  "reports.page.empty": {
+    fr: "Sélectionnez un rapport autorisé dans la colonne de gauche.",
+    en: "Pick an authorized report from the left column.",
+  },
   "theme.light": { fr: "Clair", en: "Light" },
   "theme.dark": { fr: "Sombre", en: "Dark" },
 
@@ -121,6 +133,34 @@ export const DICT = {
   "auth.role.winery_staff": { fr: "Opérateur de cave", en: "Cellar Operator" },
   "auth.role.buyer_admin": { fr: "Administrateur acheteur", en: "Buyer Admin" },
   "auth.role.buyer_staff": { fr: "Acheteur", en: "Buyer Staff" },
+  "auth.nav.platform_admin": { fr: "Administration plateforme", en: "Platform Admin" },
+  "auth.nav.organization_admin": { fr: "Administration organisation", en: "Org Admin" },
+  "auth.nav.sign_out": { fr: "Se déconnecter", en: "Sign out" },
+  "auth.organization.unassigned": { fr: "Non attribuée", en: "Unassigned" },
+  "auth.security.eyebrow": { fr: "Sécurité du compte", en: "Account security" },
+  "auth.security.title": { fr: "Modifier le mot de passe", en: "Change password" },
+  "auth.security.description": {
+    fr: "Utilisez au moins 12 caractères. Vous serez déconnecté après la modification.",
+    en: "Use at least 12 characters. You will be signed out after the change.",
+  },
+  "auth.security.current_password": { fr: "Mot de passe actuel", en: "Current password" },
+  "auth.security.new_password": { fr: "Nouveau mot de passe · 12 caractères minimum", en: "New password · at least 12 characters" },
+  "auth.security.confirm_password": { fr: "Confirmer le nouveau mot de passe", en: "Confirm new password" },
+  "auth.security.update": { fr: "Modifier le mot de passe", en: "Update password" },
+  "auth.security.updating": { fr: "Modification…", en: "Updating…" },
+  "auth.security.back": { fr: "Retour au tableau de bord", en: "Back to dashboard" },
+  "auth.security.devices": { fr: "Appareils", en: "Devices" },
+  "auth.security.sessions": { fr: "Sessions actives", en: "Active sessions" },
+  "auth.security.sign_out_others": { fr: "Déconnecter les autres", en: "Sign out others" },
+  "auth.security.this_device": { fr: "Cet appareil", en: "This device" },
+  "auth.security.another_device": { fr: "Autre appareil", en: "Another device" },
+  "auth.security.unknown_browser": { fr: "Navigateur inconnu", en: "Unknown browser" },
+  "auth.security.last_active": { fr: "Dernière activité {time}", en: "Last active {time}" },
+  "auth.security.revoke": { fr: "Révoquer", en: "Revoke" },
+  "auth.security.password_mismatch": { fr: "Les nouveaux mots de passe ne correspondent pas.", en: "New passwords do not match." },
+  "auth.security.update_failed": { fr: "La modification du mot de passe a échoué.", en: "Password update failed." },
+  "auth.security.current_incorrect": { fr: "Le mot de passe actuel est incorrect.", en: "Current password is incorrect." },
+  "auth.security.must_differ": { fr: "Le nouveau mot de passe doit être différent.", en: "New password must be different." },
 
   // ── atlas + history ─────────────────────────────────────────────────
   "atlas.title": { fr: "Atlas des vins", en: "Wine Atlas" },
@@ -168,6 +208,15 @@ export const DICT = {
   "landing.trade.cta": {
     fr: "Accéder au négoce",
     en: "Open the trade dashboard",
+  },
+  "landing.provenance.title": { fr: "Traçabilité", en: "Provenance" },
+  "landing.provenance.subtitle": {
+    fr: "Cartes d'origine simples pour bouteilles, lots et documents de circulation",
+    en: "Simple origin cards for bottles, batches, and trade documents",
+  },
+  "landing.provenance.cta": {
+    fr: "Ouvrir la traçabilité",
+    en: "Open provenance cards",
   },
 
   // ── vineyard ──────────────────────────────────────────────────────────
@@ -323,6 +372,174 @@ export const DICT = {
     fr: "Architecture, agents, et FAQ",
     en: "Architecture, agents, and FAQ",
   },
+
+  // ── provenance ───────────────────────────────────────────────────────
+  "provenance.eyebrow": { fr: "Traçabilité du vin", en: "Wine provenance" },
+  "provenance.title": {
+    fr: "Cartes d'origine simples pour bouteilles et lots",
+    en: "Simple origin cards for bottles and batches",
+  },
+  "provenance.subtitle": {
+    fr: "Cuvée garde la traçabilité légère : les domaines prouvent l'origine par une déclaration d'autorité et une preuve de lot ; les négociants prouvent la confiance par les mouvements et les documents concordants.",
+    en: "Cuvée keeps provenance lightweight: wineries prove origin with an authority statement and batch proof; merchants prove trust with movement records and matching documents.",
+  },
+  "provenance.card.eyebrow": { fr: "Carte bouteille", en: "Bottle card" },
+  "provenance.card.winery": { fr: "Carte domaine", en: "Winery card" },
+  "provenance.card.trade": { fr: "Carte négoce", en: "Trade card" },
+  "provenance.status.winery": { fr: "Déclaration vérifiée", en: "Declaration verified" },
+  "provenance.status.trade": { fr: "Chaîne commerciale vérifiée", en: "Trade chain verified" },
+
+  "provenance.mode.winery": { fr: "Mode domaine", en: "Winery mode" },
+  "provenance.mode.trade": { fr: "Mode négoce", en: "Trade mode" },
+  "provenance.sample.winery.name": { fr: "Château Demo 2024", en: "Château Demo 2024" },
+  "provenance.sample.winery.region": { fr: "Bordeaux · Pauillac", en: "Bordeaux · Pauillac" },
+  "provenance.sample.winery.batch": { fr: "LOT-PAU-2024-017", en: "LOT-PAU-2024-017" },
+  "provenance.sample.winery.alt_name": { fr: "Réserve Demo 2024", en: "Demo Reserve 2024" },
+  "provenance.sample.winery.alt_region": { fr: "Bordeaux · Margaux", en: "Bordeaux · Margaux" },
+  "provenance.sample.winery.alt_batch": { fr: "LOT-MAR-2024-041", en: "LOT-MAR-2024-041" },
+  "provenance.sample.trade.name": { fr: "Lot importé Demo 2024", en: "Demo imported lot 2024" },
+  "provenance.sample.trade.region": { fr: "Bordeaux · chaîne commerciale", en: "Bordeaux · trade chain" },
+  "provenance.sample.trade.batch": { fr: "LOT-IMP-2024-088", en: "LOT-IMP-2024-088" },
+  "provenance.sample.trade.alt_name": { fr: "Lot distributeur Demo", en: "Demo distributor lot" },
+  "provenance.sample.trade.alt_region": { fr: "Bordeaux · entrepôt", en: "Bordeaux · warehouse" },
+  "provenance.sample.trade.alt_batch": { fr: "LOT-DS-2024-019", en: "LOT-DS-2024-019" },
+  "provenance.sample.name": { fr: "Château Demo 2024", en: "Château Demo 2024" },
+  "provenance.sample.region": { fr: "Bordeaux · Pauillac", en: "Bordeaux · Pauillac" },
+  "provenance.status.partial": { fr: "Partiellement vérifié", en: "Partially verified" },
+  "provenance.field.region": { fr: "Région", en: "Region" },
+  "provenance.field.vintage": { fr: "Millésime", en: "Vintage" },
+  "provenance.field.batch": { fr: "Lot", en: "Batch" },
+  "provenance.field.proof_model": { fr: "Modèle de preuve", en: "Proof model" },
+  "provenance.proof_model": { fr: "domaine + négoce", en: "winery + trade" },
+  "provenance.verification.title": { fr: "Résultat de vérification", en: "Verification result" },
+  "provenance.verification.body": {
+    fr: "L'origine est crédible lorsque la déclaration du producteur, le numéro de lot, le document fournisseur et le mouvement pointent vers le même vin. Les preuves manquantes ou contradictoires abaissent le statut.",
+    en: "Origin is credible when the producer claim, batch number, supplier document, and movement record all point to the same wine. Missing or conflicting evidence lowers the status.",
+  },
+  "provenance.workflow.title": { fr: "Flux minimal", en: "Minimal workflow" },
+  "provenance.workflow.create_card": {
+    fr: "Créer une carte bouteille ou lot",
+    en: "Create bottle or batch card",
+  },
+  "provenance.workflow.authority": {
+    fr: "Joindre la déclaration d'autorité du domaine",
+    en: "Attach winery authority statement",
+  },
+  "provenance.workflow.batch": { fr: "Joindre la preuve de lot", en: "Attach batch or lot proof" },
+  "provenance.workflow.trade_docs": {
+    fr: "Ajouter les documents de circulation",
+    en: "Add trade movement documents",
+  },
+  "provenance.workflow.publish_qr": {
+    fr: "Publier une carte d'origine lisible par QR",
+    en: "Publish a QR-readable origin card",
+  },
+  "provenance.winery.strategy": { fr: "Stratégie domaine", en: "Winery strategy" },
+  "provenance.winery.title": {
+    fr: "Déclaration d'autorité + preuve de lot",
+    en: "Authority statement + batch proof",
+  },
+  "provenance.winery.authority.label": { fr: "Déclaration d'autorité", en: "Authority statement" },
+  "provenance.winery.authority.title": {
+    fr: "Déclaration d'origine du producteur",
+    en: "Producer origin claim",
+  },
+  "provenance.winery.authority.body": {
+    fr: "Le domaine déclare le nom du vin, l'appellation, le millésime, la propriété et le canal de sortie autorisé.",
+    en: "The winery declares the wine name, appellation, vintage, estate, and authorized release channel.",
+  },
+  "provenance.winery.batch.label": { fr: "Preuve de lot", en: "Batch proof" },
+  "provenance.winery.batch.title": {
+    fr: "Identité du lot de production",
+    en: "Production batch identity",
+  },
+  "provenance.winery.batch.body": {
+    fr: "Le numéro de lot relie les bouteilles aux registres de vendange, vinification, mise en bouteille et sortie.",
+    en: "The batch number ties bottles back to harvest, vinification, bottling, and release records.",
+  },
+  "provenance.trade.strategy": { fr: "Stratégie négoce", en: "Trade strategy" },
+  "provenance.trade.title": {
+    fr: "Mouvement + preuve documentaire",
+    en: "Movement record + document proof",
+  },
+  "provenance.trade.movement.label": { fr: "Mouvement", en: "Movement record" },
+  "provenance.trade.movement.title": { fr: "Parcours d'approvisionnement", en: "Supply path" },
+  "provenance.trade.movement.body": {
+    fr: "Le négociant enregistre le fournisseur, la date d'arrivée et le canal par lequel le vin est passé.",
+    en: "The merchant records who supplied the wine, when it arrived, and which channel it came through.",
+  },
+  "provenance.trade.document.label": { fr: "Preuve documentaire", en: "Document proof" },
+  "provenance.trade.document.title": { fr: "Documents commerciaux", en: "Commercial paperwork" },
+  "provenance.trade.document.body": {
+    fr: "Les documents doivent correspondre à l'étiquette, au millésime, au lot, à la quantité et à l'amont.",
+    en: "The documents must match the label, vintage, batch, quantity, and upstream party.",
+  },
+  "provenance.evidence.estate_registration": {
+    fr: "enregistrement du domaine",
+    en: "estate registration",
+  },
+  "provenance.evidence.aoc_declaration": { fr: "déclaration AOC/AOP", en: "AOC/AOP declaration" },
+  "provenance.evidence.authorized_seller": {
+    fr: "liste des vendeurs autorisés",
+    en: "authorized seller list",
+  },
+  "provenance.evidence.lot_number": { fr: "numéro de lot", en: "lot number" },
+  "provenance.evidence.bottling_sheet": { fr: "fiche de mise", en: "bottling sheet" },
+  "provenance.evidence.release_note": { fr: "note de sortie", en: "release note" },
+  "provenance.evidence.supplier_invoice": {
+    fr: "facture fournisseur",
+    en: "supplier invoice",
+  },
+  "provenance.evidence.warehouse_receipt": {
+    fr: "reçu d'entrepôt",
+    en: "warehouse receipt",
+  },
+  "provenance.evidence.shipping_handoff": {
+    fr: "passage transport",
+    en: "shipping handoff",
+  },
+  "provenance.evidence.invoice": { fr: "facture", en: "invoice" },
+  "provenance.evidence.customs_document": {
+    fr: "document douanier",
+    en: "customs document",
+  },
+  "provenance.evidence.temperature_log": {
+    fr: "journal de température",
+    en: "temperature log",
+  },
+  "provenance.evidence.title": { fr: "Preuves associées", en: "Linked evidence" },
+  "provenance.evidence.upload": { fr: "Téléverser", en: "Upload" },
+  "provenance.evidence.local_note": {
+    fr: "Les fichiers ajoutés ici sont visibles seulement dans cette session.",
+    en: "Files added here are visible only in this session.",
+  },
+  "provenance.timeline.title": { fr: "Parcours d'origine", en: "Origin timeline" },
+  "provenance.timeline.harvest": { fr: "Vendange enregistrée par le domaine", en: "Harvest recorded by the winery" },
+  "provenance.timeline.cellar": { fr: "Passage en cave confirmé", en: "Cellar stage confirmed" },
+  "provenance.timeline.bottling": { fr: "Mise en bouteille liée au lot", en: "Bottling linked to the lot" },
+  "provenance.timeline.release": { fr: "Sortie autorisée du domaine", en: "Authorized release from the winery" },
+  "provenance.timeline.supplier": { fr: "Fournisseur et facture enregistrés", en: "Supplier and invoice recorded" },
+  "provenance.timeline.warehouse": { fr: "Réception en entrepôt confirmée", en: "Warehouse receipt confirmed" },
+  "provenance.timeline.buyer": { fr: "Livraison au client rapprochée", en: "Buyer delivery reconciled" },
+  "provenance.timeline.shipment": { fr: "Transport et remise consignés", en: "Shipment and handoff logged" },
+  "provenance.timeline.customs": { fr: "Document douanier rapproché", en: "Customs document matched" },
+  "provenance.timeline.reception": { fr: "Réception finale contrôlée", en: "Final receipt checked" },
+  "provenance.product.add": { fr: "Ajouter un produit", en: "Add product" },
+  "provenance.product.remove": { fr: "Supprimer", en: "Remove" },
+  "provenance.product.selected": { fr: "来源卡", en: "Selected card" },
+  "provenance.product.card_hint": { fr: "点击查看详情", en: "Click to inspect" },
+  "provenance.product.total": { fr: "总数", en: "Cards" },
+  "provenance.product.active": { fr: "当前", en: "Active" },
+  "provenance.product.proof": { fr: "证据", en: "Evidence" },
+  "provenance.public.generate": { fr: "Générer un lien public", en: "Generate public link" },
+  "provenance.public.generating": { fr: "Génération…", en: "Generating…" },
+  "provenance.public.title": { fr: "Lien public", en: "Public link" },
+  "provenance.public.subtitle": {
+    fr: "Copiez ou ouvrez ce lien pour afficher la version publique en lecture seule.",
+    en: "Copy or open this link to view the public read-only version.",
+  },
+  "provenance.public.open": { fr: "Ouvrir", en: "Open" },
+  "provenance.public.copy": { fr: "Copier", en: "Copy" },
 
   // ── workflow ──────────────────────────────────────────────────────────
   "workflow.title": { fr: "Flux de travail", en: "Workflow" },
