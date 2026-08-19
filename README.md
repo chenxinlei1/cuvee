@@ -18,16 +18,20 @@ Cuvée 是一个面向葡萄酒业务的 Web 平台，覆盖酒庄分析、贸�
 
 ## 技术栈
 
-- Next.js 15
-- React 19
-- TypeScript
-- Tailwind CSS
-- PostgreSQL
-- Drizzle ORM
-- Docker / Docker Compose
-- Kubernetes / Helm
-- OpenAI、Anthropic、Qwen、DeepSeek、Ollama 等可选 LLM Provider
-- Tavily、Brave、SearXNG 等可选检索 Provider
+Cuvée 采用前后端一体的 Next.js 架构，核心业务数据落在 PostgreSQL，AI 分析和检索能力通过可替换 Provider 接入。
+
+| 技术 | 用途 |
+| --- | --- |
+| Next.js 15 | 应用主框架，负责页面路由、服务端渲染、API Routes 和生产构建。 |
+| React 19 | 构建酒庄工作区、贸易工作区、溯源管理、公开扫码页和管理后台等交互界面。 |
+| TypeScript | 为权限、用户、组织、报告、溯源记录和分析结果提供类型约束。 |
+| Tailwind CSS | 负责界面样式、响应式布局、深浅色主题和后台工作台视觉设计。 |
+| PostgreSQL | 保存用户、角色、权限、组织、报告、文档、任务队列、审计日志和溯源数据。 |
+| Drizzle ORM | 管理数据库 Schema、迁移和类型安全的数据访问。 |
+| Docker / Docker Compose | 本地或单机部署应用、PostgreSQL、备份服务、Loki、Promtail 和 Grafana。 |
+| Kubernetes / Helm | 部署到 minikube 或生产集群，拆分 Web 与 Worker，并配置探针、滚动更新和扩缩容。 |
+| OpenAI / Anthropic / Qwen / DeepSeek / Ollama | 作为可选 LLM Provider，用于结构化葡萄酒分析、报告生成和后续 AI 扩展。 |
+| Tavily / Brave / SearXNG | 作为可选检索 Provider，用于获取公开资料、市场信息、酒评和法规来源。 |
 
 ## 快速启动
 
