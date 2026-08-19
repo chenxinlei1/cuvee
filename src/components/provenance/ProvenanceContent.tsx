@@ -22,7 +22,6 @@ interface ProductRecord {
   batchKey: DictKey;
   statusKey: DictKey;
   evidenceKeys: DictKey[];
-  uploadedEvidence: string[];
   timelineKeys: DictKey[];
 }
 
@@ -94,7 +93,6 @@ const MODE_DEFAULTS: Record<"winery" | "trade", ProductRecord[]> = {
         "provenance.evidence.aoc_declaration",
         "provenance.evidence.lot_number",
       ],
-      uploadedEvidence: [],
       timelineKeys: [
         "provenance.timeline.harvest",
         "provenance.timeline.bottling",
@@ -113,7 +111,6 @@ const MODE_DEFAULTS: Record<"winery" | "trade", ProductRecord[]> = {
         "provenance.evidence.authorized_seller",
         "provenance.evidence.release_note",
       ],
-      uploadedEvidence: [],
       timelineKeys: [
         "provenance.timeline.harvest",
         "provenance.timeline.cellar",
@@ -134,7 +131,6 @@ const MODE_DEFAULTS: Record<"winery" | "trade", ProductRecord[]> = {
         "provenance.evidence.warehouse_receipt",
         "provenance.evidence.invoice",
       ],
-      uploadedEvidence: [],
       timelineKeys: [
         "provenance.timeline.supplier",
         "provenance.timeline.warehouse",
@@ -153,7 +149,6 @@ const MODE_DEFAULTS: Record<"winery" | "trade", ProductRecord[]> = {
         "provenance.evidence.customs_document",
         "provenance.evidence.temperature_log",
       ],
-      uploadedEvidence: [],
       timelineKeys: [
         "provenance.timeline.shipment",
         "provenance.timeline.customs",
@@ -202,64 +197,6 @@ export function ProvenanceContent() {
     if (!selected && products[0]) setSelectedId(products[0].id);
   }, [products, selected]);
 
-  const addProduct = () => {
-    const nextIndex = products.length + 1;
-    const next: ProductRecord =
-      activeMode === "winery"
-        ? {
-            id: `${activeMode}-${nextIndex}`,
-            titleKey: "provenance.sample.winery.name",
-            subtitleKey: "provenance.card.winery",
-            regionKey: "provenance.sample.winery.region",
-            batchKey: "provenance.sample.winery.batch",
-            statusKey: "provenance.status.partial",
-            evidenceKeys: ["provenance.evidence.lot_number", "provenance.evidence.release_note"],
-            uploadedEvidence: [],
-            timelineKeys: [
-              "provenance.timeline.harvest",
-              "provenance.timeline.bottling",
-              "provenance.timeline.release",
-            ],
-          }
-        : {
-            id: `${activeMode}-${nextIndex}`,
-            titleKey: "provenance.sample.trade.name",
-            subtitleKey: "provenance.card.trade",
-            regionKey: "provenance.sample.trade.region",
-            batchKey: "provenance.sample.trade.batch",
-            statusKey: "provenance.status.partial",
-            evidenceKeys: ["provenance.evidence.invoice", "provenance.evidence.shipping_handoff"],
-            uploadedEvidence: [],
-            timelineKeys: [
-              "provenance.timeline.supplier",
-              "provenance.timeline.warehouse",
-              "provenance.timeline.buyer",
-            ],
-          };
-    setProducts((current) => [...current, next]);
-    setSelectedId(next.id);
-  };
-
-  const removeProduct = (id: string) => {
-    setProducts((current) => {
-      const next = current.filter((item) => item.id !== id);
-      if (selectedId === id) setSelectedId(next[0]?.id ?? "");
-      return next.length ? next : MODE_DEFAULTS[activeMode];
-    });
-  };
-
-  const addEvidenceFiles = (files: FileList | null) => {
-    if (!selected || !files?.length) return;
-    const names = Array.from(files).map((file) => file.name);
-    setProducts((current) =>
-      current.map((item) =>
-        item.id === selected.id
-          ? { ...item, uploadedEvidence: [...item.uploadedEvidence, ...names] }
-          : item,
-      ),
-    );
-  };
-
   const shareSelectedCard = async () => {
     if (!selected) return;
     setShareState("loading");
@@ -275,7 +212,7 @@ export function ProvenanceContent() {
           status: t(selected.statusKey),
           evidence: selected.evidenceKeys.map((key) => t(key)),
           timeline: selected.timelineKeys.map((key) => t(key)),
-          uploadedEvidence: selected.uploadedEvidence,
+          uploadedEvidence: [],
         }),
       });
       const data = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
@@ -286,8 +223,6 @@ export function ProvenanceContent() {
       setShareState("error");
     }
   };
-
-  const selectedIsLast = products.length <= 1;
 
   return (
     <main className="container mx-auto max-w-6xl px-7 py-12">
@@ -320,9 +255,6 @@ export function ProvenanceContent() {
               </h2>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="chip bg-foreground text-background" onClick={addProduct}>
-                {t("provenance.product.add")}
-              </button>
               <button type="button" className="chip border border-line bg-surface-1" onClick={shareSelectedCard}>
                 {shareState === "loading" ? t("provenance.public.generating") : t("provenance.public.generate")}
               </button>
@@ -372,19 +304,8 @@ export function ProvenanceContent() {
                       </span>
                     ))}
                   </div>
-                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-line/60 pt-3">
+                  <div className="mt-4 border-t border-line/60 pt-3">
                     <span className="text-soft text-xs">{t("provenance.product.card_hint")}</span>
-                    <button
-                      type="button"
-                      disabled={selectedIsLast}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeProduct(item.id);
-                      }}
-                      className="rounded-pill border border-line px-2.5 py-1 text-[11px] text-soft transition hover:border-foreground/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {t("provenance.product.remove")}
-                    </button>
                   </div>
                 </div>
               );
@@ -411,36 +332,14 @@ export function ProvenanceContent() {
                     <Fact label={t("provenance.field.proof_model")} value={t("provenance.proof_model")} />
                   </div>
                   <div className="mt-5 rounded-xl border border-line bg-surface-1 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="kicker">{t("provenance.evidence.title")}</p>
-                      <label className="chip cursor-pointer bg-foreground text-background">
-                        {t("provenance.evidence.upload")}
-                        <input
-                          type="file"
-                          multiple
-                          className="hidden"
-                          onChange={(event) => {
-                            addEvidenceFiles(event.currentTarget.files);
-                            event.currentTarget.value = "";
-                          }}
-                        />
-                      </label>
-                    </div>
+                    <p className="kicker">{t("provenance.evidence.title")}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {selected.evidenceKeys.map((evidence) => (
                         <span key={evidence} className="chip bg-surface-3">
                           {t(evidence)}
                         </span>
                       ))}
-                      {selected.uploadedEvidence.map((evidence, index) => (
-                        <span key={`${evidence}-${index}`} className="chip bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-                          {evidence}
-                        </span>
-                      ))}
                     </div>
-                    {selected.uploadedEvidence.length ? (
-                      <p className="text-soft mt-3 text-xs">{t("provenance.evidence.local_note")}</p>
-                    ) : null}
                   </div>
 
                   {shareUrl ? (
